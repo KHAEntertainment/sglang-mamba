@@ -1129,6 +1129,75 @@ class Scheduler(
                 f"Error handling Mamba state eviction: {e}", exc_info=True
             )
 
+    def init_agent_system(self):
+        """
+        Initialize the agent framework for tool-calling support.
+
+        This system enables:
+        - Tool registration and management
+        - Tool call parsing from model outputs
+        - Safe tool execution
+        - Agent loop for multi-turn tool workflows
+
+        **Backward Compatibility**: This method only activates when
+        --enable-agent-tools is set. Otherwise, it's a no-op.
+        """
+        server_args = self.server_args
+
+        # Initialize agent components as None (default)
+        self.tool_registry = None
+        self.tool_parser = None
+        self.tool_executor = None
+
+        # Only initialize if agent tools enabled
+        if not getattr(server_args, "enable_agent_tools", False):
+            logger.info("Agent tools disabled (standard mode)")
+            return
+
+        logger.info("Initializing agent tool framework...")
+
+        # Import agent modules (lazy import)
+        try:
+            from sglang.srt.agents import (
+                ToolRegistry,
+                ToolCallParser,
+                ToolExecutionEngine,
+            )
+            from sglang.srt.agents.builtin_tools import register_builtin_tools
+        except ImportError as e:
+            logger.error(f"Failed to import agent modules: {e}")
+            logger.warning("Agent system will be disabled")
+            return
+
+        try:
+            # Create tool registry
+            self.tool_registry = ToolRegistry()
+
+            # Create tool parser
+            self.tool_parser = ToolCallParser()
+
+            # Create tool execution engine
+            self.tool_executor = ToolExecutionEngine(
+                tool_registry=self.tool_registry,
+                default_timeout=getattr(server_args, "agent_tool_timeout", 30.0),
+                enable_sandboxing=True,
+            )
+
+            # Register built-in tools
+            tier_manager = getattr(self, "tier_manager", None)
+            num_tools = register_builtin_tools(self.tool_registry, tier_manager)
+
+            logger.info(
+                f"Agent system initialized successfully: {num_tools} built-in tools registered"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to initialize agent system: {e}", exc_info=True)
+            logger.warning("Agent system will be disabled")
+            self.tool_registry = None
+            self.tool_parser = None
+            self.tool_executor = None
+
     def init_schedule_policy(self):
         # Init schedule policy and new token estimation
         self.policy = SchedulePolicy(
