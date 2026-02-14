@@ -542,6 +542,12 @@ class ServerArgs:
     enable_tier_background_cleanup: bool = True
     tier_cleanup_interval: float = 60.0  # 60 seconds
 
+    # Agent tool-calling framework (Phase 3)
+    enable_agent_tools: bool = False
+    agent_tool_timeout: float = 30.0
+    agent_max_iterations: int = 10
+    agent_max_tool_calls_per_iteration: int = 5
+
     # Hierarchical cache
     enable_hierarchical_cache: bool = False
     hicache_ratio: float = 2.0
@@ -4346,6 +4352,32 @@ class ServerArgs:
             type=float,
             default=ServerArgs.tier_cleanup_interval,
             help="Seconds between tier cleanup checks. Default: 60.0.",
+        )
+
+        # Agent tool-calling framework (Phase 3)
+        parser.add_argument(
+            "--enable-agent-tools",
+            action="store_true",
+            default=ServerArgs.enable_agent_tools,
+            help="Enable agent tool-calling framework. Allows models to call tools (memory, calculator, etc.). Default: False.",
+        )
+        parser.add_argument(
+            "--agent-tool-timeout",
+            type=float,
+            default=ServerArgs.agent_tool_timeout,
+            help="Timeout for individual tool execution in seconds. Default: 30.0.",
+        )
+        parser.add_argument(
+            "--agent-max-iterations",
+            type=int,
+            default=ServerArgs.agent_max_iterations,
+            help="Maximum tool-calling iterations per user request. Default: 10.",
+        )
+        parser.add_argument(
+            "--agent-max-tool-calls-per-iteration",
+            type=int,
+            default=ServerArgs.agent_max_tool_calls_per_iteration,
+            help="Maximum tool calls per iteration. Default: 5.",
         )
 
         # Hierarchical cache
