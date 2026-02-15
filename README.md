@@ -64,6 +64,27 @@ Its core features include:
 - **Active Community**: SGLang is open-source and supported by a vibrant community with widespread industry adoption, powering over 400,000 GPUs worldwide.
 - **RL & Post-Training Backbone**: SGLang is a proven rollout backend across the world, with native RL integrations and adoption by well-known post-training frameworks such as [**AReaL**](https://github.com/inclusionAI/AReaL), [**Miles**](https://github.com/radixark/miles), [**slime**](https://github.com/THUDM/slime), [**Tunix**](https://github.com/google/tunix), [**verl**](https://github.com/volcengine/verl) and more.
 
+## 🤖 Agent Framework (New!)
+
+SGLang now includes a **stateful tool-calling framework** designed for Mamba models with persistent state management. This enables:
+
+- **Tool-Calling**: 4 built-in tools (calculator, memory store/recall/search) with async execution, parameter validation, and timeout handling
+- **3-Tier Memory Management**: Automatic state transitions between VRAM (active), RAM (warm), and disk (cold) tiers with LRU-based eviction
+- **Snapshot Persistence**: Serialize and restore Mamba SSM states across server restarts
+- **REST + WebSocket APIs**: 13 endpoints for tool execution, memory, conversations, and tier management with real-time streaming
+- **Backward Compatible**: All features are opt-in via CLI flags—existing workflows remain unchanged
+
+```bash
+# Quick Start - Enable agent tools
+python -m sglang.launch_server \
+  --model-path ibm-granite/granite-4.0-h-small \
+  --enable-agent-tools \
+  --enable-memory-tiers \
+  --enable-snapshot-persistence
+```
+
+**Learn more:** [Agent Framework Documentation](docs/agent_framework/README.md)
+
 ## Getting Started
 - [Install SGLang](https://docs.sglang.io/get_started/install.html)
 - [Quick Start](https://docs.sglang.io/basic_usage/send_request.html)
