@@ -101,9 +101,11 @@ from sglang.srt.managers.io_struct import (
     DestroyWeightsUpdateGroupReqInput,
     EmbeddingReqInput,
     GenerateReqInput,
+    GetSnapshotInfoReqInput,
     GetWeightsByNameReqInput,
     InitWeightsSendGroupForRemoteInstanceReqInput,
     InitWeightsUpdateGroupReqInput,
+    ListSnapshotsReqInput,
     LoadLoRAAdapterFromTensorsReqInput,
     LoadLoRAAdapterReqInput,
     OpenSessionReqInput,
@@ -112,6 +114,7 @@ from sglang.srt.managers.io_struct import (
     ProfileReqInput,
     ReleaseMemoryOccupationReqInput,
     ResumeMemoryOccupationReqInput,
+    SaveSnapshotReqInput,
     SendWeightsToRemoteInstanceReqInput,
     SeparateReasoningReqInput,
     SetInternalStateReq,
@@ -1108,6 +1111,103 @@ async def update_weight_version(obj: UpdateWeightVersionReqInput, request: Reque
                 "message": f"Failed to update weight version: {str(e)}",
             },
             status_code=HTTPStatus.BAD_REQUEST,
+        )
+
+
+@app.post("/save_snapshot")
+@auth_level(AuthLevel.ADMIN_OPTIONAL)
+async def save_snapshot(obj: SaveSnapshotReqInput, request: Request):
+    """Save a Mamba state snapshot."""
+    try:
+        result = await _global_state.tokenizer_manager.save_snapshot(obj)
+        if result.success:
+            return ORJSONResponse(
+                {
+                    "success": True,
+                    "snapshot_id": result.snapshot_id,
+                    "message": result.message,
+                },
+                status_code=HTTPStatus.OK,
+            )
+        else:
+            return ORJSONResponse(
+                {
+                    "success": False,
+                    "message": result.message,
+                },
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+    except Exception as e:
+        return ORJSONResponse(
+            {
+                "success": False,
+                "message": f"Error saving snapshot: {str(e)}",
+            },
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+        )
+
+
+@app.post("/list_snapshots")
+@auth_level(AuthLevel.ADMIN_OPTIONAL)
+async def list_snapshots(obj: ListSnapshotsReqInput, request: Request):
+    """List all snapshots for a conversation."""
+    try:
+        result = await _global_state.tokenizer_manager.list_snapshots(obj)
+        if result.success:
+            return ORJSONResponse(
+                {
+                    "success": True,
+                    "snapshots": result.snapshots,
+                },
+                status_code=HTTPStatus.OK,
+            )
+        else:
+            return ORJSONResponse(
+                {
+                    "success": False,
+                    "message": result.message,
+                },
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+    except Exception as e:
+        return ORJSONResponse(
+            {
+                "success": False,
+                "message": f"Error listing snapshots: {str(e)}",
+            },
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+        )
+
+
+@app.post("/get_snapshot_info")
+@auth_level(AuthLevel.ADMIN_OPTIONAL)
+async def get_snapshot_info(obj: GetSnapshotInfoReqInput, request: Request):
+    """Get metadata for a specific snapshot."""
+    try:
+        result = await _global_state.tokenizer_manager.get_snapshot_info(obj)
+        if result.success:
+            return ORJSONResponse(
+                {
+                    "success": True,
+                    "metadata": result.metadata,
+                },
+                status_code=HTTPStatus.OK,
+            )
+        else:
+            return ORJSONResponse(
+                {
+                    "success": False,
+                    "message": result.message,
+                },
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+    except Exception as e:
+        return ORJSONResponse(
+            {
+                "success": False,
+                "message": f"Error getting snapshot info: {str(e)}",
+            },
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
         )
 
 

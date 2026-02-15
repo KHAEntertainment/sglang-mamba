@@ -60,10 +60,13 @@ from sglang.srt.managers.io_struct import (
     EmbeddingReqInput,
     FreezeGCReq,
     GenerateReqInput,
+    GetSnapshotInfoReqInput,
     HealthCheckOutput,
+    ListSnapshotsReqInput,
     LoadLoRAAdapterReqInput,
     OpenSessionReqOutput,
     PauseGenerationReqInput,
+    SaveSnapshotReqInput,
     SessionParams,
     TokenizedEmbeddingReqInput,
     TokenizedGenerateReqInput,
@@ -1344,6 +1347,27 @@ class TokenizerManager(TokenizerCommunicatorMixin, TokenizerManagerMultiItemMixi
             self.is_pause = False
             await self.send_to_scheduler.send_pyobj(obj)
             self.is_pause_cond.notify_all()
+
+    async def save_snapshot(self, obj: "SaveSnapshotReqInput"):
+        """Forward snapshot save request to scheduler."""
+        await self.send_to_scheduler.send_pyobj(obj)
+        # Wait for response from scheduler
+        recv_obj = await self.recv_from_scheduler.recv_pyobj()
+        return recv_obj
+
+    async def list_snapshots(self, obj: "ListSnapshotsReqInput"):
+        """Forward snapshot list request to scheduler."""
+        await self.send_to_scheduler.send_pyobj(obj)
+        # Wait for response from scheduler
+        recv_obj = await self.recv_from_scheduler.recv_pyobj()
+        return recv_obj
+
+    async def get_snapshot_info(self, obj: "GetSnapshotInfoReqInput"):
+        """Forward snapshot info request to scheduler."""
+        await self.send_to_scheduler.send_pyobj(obj)
+        # Wait for response from scheduler
+        recv_obj = await self.recv_from_scheduler.recv_pyobj()
+        return recv_obj
 
     async def update_weights_from_disk(
         self,
