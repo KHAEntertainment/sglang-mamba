@@ -521,6 +521,33 @@ class ServerArgs:
     mamba_scheduler_strategy: str = "auto"
     mamba_track_interval: int = 256
 
+    # Mamba state persistence (snapshot system)
+    enable_snapshot_persistence: bool = False
+    snapshot_dir: Optional[str] = None
+    snapshot_retention_count: int = 10
+    snapshot_trigger_policy: str = "every_turn"
+    snapshot_every_n_turns: int = 5
+    snapshot_min_interval_seconds: float = 1.0
+    snapshot_keep_named_branches: bool = True
+    snapshot_auto_restore: bool = True
+
+    # Mamba memory tier management (Phase 2.5)
+    enable_memory_tiers: bool = True
+    max_warm_conversations: int = 100
+    max_warm_memory_gb: float = 10.0
+    conversation_active_timeout: float = 300.0  # 5 minutes
+    conversation_warm_timeout: float = 1800.0  # 30 minutes
+    conversation_cold_retention: float = 604800.0  # 7 days
+    enable_cross_session_refs: bool = True
+    enable_tier_background_cleanup: bool = True
+    tier_cleanup_interval: float = 60.0  # 60 seconds
+
+    # Agent tool-calling framework (Phase 3)
+    enable_agent_tools: bool = False
+    agent_tool_timeout: float = 30.0
+    agent_max_iterations: int = 10
+    agent_max_tool_calls_per_iteration: int = 5
+
     # Hierarchical cache
     enable_hierarchical_cache: bool = False
     hicache_ratio: float = 2.0
@@ -4208,6 +4235,161 @@ class ServerArgs:
             type=int,
             default=ServerArgs.mamba_track_interval,
             help="The interval to track the mamba state during decode.",
+        )
+
+        # Mamba state persistence (snapshot system)
+        parser.add_argument(
+            "--enable-snapshot-persistence",
+            action="store_true",
+            help="Enable Mamba state snapshot persistence to disk. "
+            "Allows stateful inference that persists across server restarts. "
+            "Only applies to Mamba/hybrid models. Has no effect on standard transformers.",
+        )
+        parser.add_argument(
+            "--snapshot-dir",
+            type=str,
+            default=None,
+            help="Directory for storing Mamba state snapshots. "
+            "If not specified and --enable-snapshot-persistence is set, "
+            "defaults to './sglang_snapshots'.",
+        )
+        parser.add_argument(
+            "--snapshot-retention-count",
+            type=int,
+            default=ServerArgs.snapshot_retention_count,
+            help="Maximum number of snapshots to retain per conversation. "
+            "Older snapshots are automatically pruned. Default: 10.",
+        )
+        parser.add_argument(
+            "--snapshot-trigger-policy",
+            type=str,
+            default=ServerArgs.snapshot_trigger_policy,
+            choices=["every_turn", "every_n_turns", "on_tool_call", "manual_only"],
+            help="Policy for when to take snapshots. "
+            "'every_turn': snapshot after each turn (most storage), "
+            "'every_n_turns': snapshot every N turns (see --snapshot-every-n-turns), "
+            "'on_tool_call': snapshot only after tool executions, "
+            "'manual_only': only via explicit API calls. Default: every_turn.",
+        )
+        parser.add_argument(
+            "--snapshot-every-n-turns",
+            type=int,
+            default=ServerArgs.snapshot_every_n_turns,
+            help="If --snapshot-trigger-policy=every_n_turns, snapshot every N turns. Default: 5.",
+        )
+        parser.add_argument(
+            "--snapshot-min-interval-seconds",
+            type=float,
+            default=ServerArgs.snapshot_min_interval_seconds,
+            help="Minimum seconds between snapshots (prevents spam). Default: 1.0.",
+        )
+        parser.add_argument(
+            "--snapshot-keep-named-branches",
+            action="store_true",
+            default=ServerArgs.snapshot_keep_named_branches,
+            help="Keep named branches when pruning old snapshots. Default: True.",
+        )
+        parser.add_argument(
+            "--snapshot-auto-restore",
+            action="store_true",
+            default=ServerArgs.snapshot_auto_restore,
+            help="Automatically restore latest snapshots on server startup. Default: True.",
+        )
+
+        # Mamba memory tier management (Phase 2.5)
+        parser.add_argument(
+            "--enable-memory-tiers",
+            action="store_true",
+            help="Enable 3-tier memory management (VRAM→Host RAM→Disk) for Mamba states. "
+            "Provides fast restoration from host memory tier. Default: %(default)s.",
+        )
+        parser.add_argument(
+            "--no-enable-memory-tiers",
+            dest="enable_memory_tiers",
+            action="store_false",
+            help="Disable memory tiers (keep all state in VRAM only).",
+        )
+        parser.set_defaults(enable_memory_tiers=ServerArgs.enable_memory_tiers)
+        parser.add_argument(
+            "--max-warm-conversations",
+            type=int,
+            default=ServerArgs.max_warm_conversations,
+            help="Maximum number of conversations to keep in host RAM (warm tier). Default: 100.",
+        )
+        parser.add_argument(
+            "--max-warm-memory-gb",
+            type=float,
+            default=ServerArgs.max_warm_memory_gb,
+            help="Maximum host RAM usage for warm tier in GB. Default: 10.0.",
+        )
+        parser.add_argument(
+            "--conversation-active-timeout",
+            type=float,
+            default=ServerArgs.conversation_active_timeout,
+            help="Seconds of inactivity before ACTIVE (VRAM) → WARM (host RAM) transition. Default: 300 (5 min).",
+        )
+        parser.add_argument(
+            "--conversation-warm-timeout",
+            type=float,
+            default=ServerArgs.conversation_warm_timeout,
+            help="Seconds of inactivity before WARM (host RAM) → COLD (disk) transition. Default: 1800 (30 min).",
+        )
+        parser.add_argument(
+            "--conversation-cold-retention",
+            type=float,
+            default=ServerArgs.conversation_cold_retention,
+            help="Seconds before COLD (disk) conversations are archived/deleted. Default: 604800 (7 days).",
+        )
+        parser.add_argument(
+            "--enable-cross-session-refs",
+            action="store_true",
+            default=ServerArgs.enable_cross_session_refs,
+            help="Allow loading state from other conversations (cross-session references). "
+            "Enables agents to reference previous conversation contexts. Default: True.",
+        )
+        parser.add_argument(
+            "--enable-tier-background-cleanup",
+            action="store_true",
+            default=ServerArgs.enable_tier_background_cleanup,
+            help="Run background thread for automatic tier transitions. Default: True.",
+        )
+        parser.add_argument(
+            "--tier-cleanup-interval",
+            type=float,
+            default=ServerArgs.tier_cleanup_interval,
+            help="Seconds between tier cleanup checks. Default: 60.0.",
+        )
+
+        # Agent tool-calling framework (Phase 3)
+        parser.add_argument(
+            "--enable-agent-tools",
+            action="store_true",
+            help="Enable agent tool-calling framework. Allows models to call tools (memory, calculator, etc.). Default: %(default)s.",
+        )
+        parser.add_argument(
+            "--no-enable-agent-tools",
+            dest="enable_agent_tools",
+            action="store_false",
+            help="Disable agent tools (standard inference mode).",
+        )
+        parser.set_defaults(enable_agent_tools=ServerArgs.enable_agent_tools)
+        parser.add_argument(
+            "--agent-tool-timeout",
+            type=float,
+            default=ServerArgs.agent_tool_timeout,
+            help="Timeout for individual tool execution in seconds. Default: 30.0.",
+        )
+        parser.add_argument(
+            "--agent-max-iterations",
+            type=int,
+            default=ServerArgs.agent_max_iterations,
+            help="Maximum tool-calling iterations per user request. Default: 10.",
+        )
+        parser.add_argument(
+            "--agent-max-tool-calls-per-iteration",
+            type=int,
+            default=ServerArgs.agent_max_tool_calls_per_iteration,
+            help="Maximum tool calls per iteration. Default: 5.",
         )
 
         # Hierarchical cache
