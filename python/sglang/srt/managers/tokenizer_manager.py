@@ -61,6 +61,8 @@ from sglang.srt.managers.io_struct import (
     FreezeGCReq,
     GenerateReqInput,
     GetSnapshotInfoReqInput,
+    RestoreSnapshotReqInput,
+    DeleteSnapshotReqInput,
     HealthCheckOutput,
     ListSnapshotsReqInput,
     LoadLoRAAdapterReqInput,
@@ -1364,6 +1366,20 @@ class TokenizerManager(TokenizerCommunicatorMixin, TokenizerManagerMultiItemMixi
 
     async def get_snapshot_info(self, obj: "GetSnapshotInfoReqInput"):
         """Forward snapshot info request to scheduler."""
+        await self.send_to_scheduler.send_pyobj(obj)
+        # Wait for response from scheduler
+        recv_obj = await self.recv_from_scheduler.recv_pyobj()
+        return recv_obj
+
+    async def restore_snapshot(self, obj: "RestoreSnapshotReqInput"):
+        """Forward snapshot restore request to scheduler."""
+        await self.send_to_scheduler.send_pyobj(obj)
+        # Wait for response from scheduler
+        recv_obj = await self.recv_from_scheduler.recv_pyobj()
+        return recv_obj
+
+    async def delete_snapshot(self, obj: "DeleteSnapshotReqInput"):
+        """Forward snapshot delete request to scheduler."""
         await self.send_to_scheduler.send_pyobj(obj)
         # Wait for response from scheduler
         recv_obj = await self.recv_from_scheduler.recv_pyobj()

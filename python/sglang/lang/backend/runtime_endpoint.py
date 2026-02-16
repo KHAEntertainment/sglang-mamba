@@ -400,6 +400,52 @@ class RuntimeEndpoint(BaseBackend):
         result = res.json()
         return result.get("metadata", {})
 
+    def restore_snapshot(
+        self,
+        rid: str,
+        conversation_id: str,
+        turn_number: Optional[int] = None,
+        branch_name: Optional[str] = None,
+        create_new_request: bool = False,
+    ) -> Dict:
+        """Restore Mamba state from a snapshot via HTTP API."""
+        res = http_request(
+            self.base_url + "/restore_snapshot",
+            json={
+                "rid": rid,
+                "conversation_id": conversation_id,
+                "turn_number": turn_number,
+                "branch_name": branch_name,
+                "create_new_request": create_new_request,
+            },
+            api_key=self.api_key,
+            verify=self.verify,
+            method="POST",
+        )
+        self._assert_success(res)
+        return res.json()
+
+    def delete_snapshot(
+        self,
+        conversation_id: str,
+        turn_number: Optional[int] = None,
+        branch_name: Optional[str] = None,
+    ) -> Dict:
+        """Delete a snapshot via HTTP API."""
+        res = http_request(
+            self.base_url + "/delete_snapshot",
+            json={
+                "conversation_id": conversation_id,
+                "turn_number": turn_number,
+                "branch_name": branch_name,
+            },
+            api_key=self.api_key,
+            verify=self.verify,
+            method="POST",
+        )
+        self._assert_success(res)
+        return res.json()
+
     def _assert_success(self, res):
         if res.status_code != 200:
             try:

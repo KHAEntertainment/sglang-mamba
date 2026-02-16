@@ -101,6 +101,8 @@ from sglang.srt.managers.io_struct import (
     GetWeightsByNameReqInput,
     HealthCheckOutput,
     ListSnapshotsReqInput,
+    RestoreSnapshotReqInput,
+    DeleteSnapshotReqInput,
     InitWeightsSendGroupForRemoteInstanceReqInput,
     InitWeightsSendGroupForRemoteInstanceReqOutput,
     InitWeightsUpdateGroupReqInput,
@@ -1287,6 +1289,153 @@ class Scheduler(
                 message=f"Error getting snapshot info: {str(e)}"
             )
 
+    def handle_restore_snapshot(self, recv_req):
+        """Handle a request to restore Mamba state from a snapshot.
+
+        Args:
+            recv_req: RestoreSnapshotReqInput with rid, conversation_id, turn_number, branch_name
+
+        Returns:
+            RestoreSnapshotReqOutput with success status
+        """
+        from sglang.srt.managers.io_struct import RestoreSnapshotReqOutput
+
+        if self.snapshot_manager is None:
+            return RestoreSnapshotReqOutput(
+                success=False,
+                message="Snapshot system not enabled. Start server with --enable-mamba-snapshots"
+            )
+
+        # Note: create_new_request is deferred to Phase 3
+        if recv_req.create_new_request:
+            return RestoreSnapshotReqOutput(
+                success=False,
+                message="create_new_request is not yet implemented (Phase 3)"
+            )
+
+        try:
+            # Find the request by rid
+            req = self._find_request_by_rid(recv_req.rid)
+            if req is None:
+                return RestoreSnapshotReqOutput(
+                    success=False,
+                    message=f"Request not found: {recv_req.rid}"
+                )
+
+            # Check that request is idle (not currently running)
+            if self.running_batch and req in self.running_batch.reqs:
+                return RestoreSnapshotReqOutput(
+                    success=False,
+                    message="Cannot restore snapshot while request is running. Wait until request is idle."
+                )
+
+            # Check if request has mamba pool index
+            if not hasattr(req, 'mamba_pool_idx') or req.mamba_pool_idx is None:
+                return RestoreSnapshotReqOutput(
+                    success=False,
+                    message="Request does not have Mamba state allocated"
+                )
+
+            # Load snapshot
+            snapshot = self.snapshot_manager.load_snapshot(
+                recv_req.conversation_id,
+                recv_req.turn_number,
+                recv_req.branch_name
+            )
+
+            if snapshot is None:
+                return RestoreSnapshotReqOutput(
+                    success=False,
+                    message=f"Snapshot not found: conversation={recv_req.conversation_id}, "
+                            f"turn={recv_req.turn_number}, branch={recv_req.branch_name}"
+                )
+
+            conv_states, temporal_states, metadata = snapshot
+
+            # Get mamba_pool from req_to_token_pool
+            mamba_pool = getattr(self.req_to_token_pool, "mamba_pool", None)
+            if mamba_pool is None:
+                return RestoreSnapshotReqOutput(
+                    success=False,
+                    message="Mamba pool not available"
+                )
+
+            # Inject state back into pool
+            self.snapshot_manager.inject_state_to_pool(
+                mamba_pool, req.mamba_pool_idx, conv_states, temporal_states
+            )
+
+            # Update request metadata
+            # Note: We cannot update fill_ids or input_text here because we don't store it
+            # This is a known limitation documented in the plan
+
+            logger.info(
+                f"Snapshot restored: conversation={recv_req.conversation_id}, "
+                f"turn={recv_req.turn_number}, branch={recv_req.branch_name}, "
+                f"rid={recv_req.rid}"
+            )
+
+            return RestoreSnapshotReqOutput(
+                success=True,
+                message="Snapshot restored successfully",
+                token_count=metadata.token_count if metadata else None
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to restore snapshot: {e}", exc_info=True)
+            return RestoreSnapshotReqOutput(
+                success=False,
+                message=f"Error restoring snapshot: {str(e)}"
+            )
+
+    def handle_delete_snapshot(self, recv_req):
+        """Handle a request to delete a snapshot.
+
+        Args:
+            recv_req: DeleteSnapshotReqInput with conversation_id, turn_number, branch_name
+
+        Returns:
+            DeleteSnapshotReqOutput with success status
+        """
+        from sglang.srt.managers.io_struct import DeleteSnapshotReqOutput
+
+        if self.snapshot_manager is None:
+            return DeleteSnapshotReqOutput(
+                success=False,
+                message="Snapshot system not enabled. Start server with --enable-mamba-snapshots"
+            )
+
+        try:
+            # Delete the snapshot
+            success = self.snapshot_manager.delete_snapshot(
+                recv_req.conversation_id,
+                recv_req.turn_number,
+                recv_req.branch_name
+            )
+
+            if success:
+                logger.info(
+                    f"Snapshot deleted: conversation={recv_req.conversation_id}, "
+                    f"turn={recv_req.turn_number}, branch={recv_req.branch_name}"
+                )
+                return DeleteSnapshotReqOutput(
+                    success=True,
+                    message="Snapshot deleted successfully"
+                )
+            else:
+                return DeleteSnapshotReqOutput(
+                    success=False,
+                    message=f"Snapshot not found: conversation={recv_req.conversation_id}, "
+                            f"turn={recv_req.turn_number}, branch={recv_req.branch_name}"
+                )
+
+        except Exception as e:
+            logger.error(f"Failed to delete snapshot: {e}", exc_info=True)
+            return DeleteSnapshotReqOutput(
+                success=False,
+                message=f"Error deleting snapshot: {str(e)}"
+            )
+
     def handle_mamba_state_eviction(
         self,
         conversation_id: str,
@@ -1724,6 +1873,8 @@ class Scheduler(
                 (SaveSnapshotReqInput, self.handle_save_snapshot),
                 (ListSnapshotsReqInput, self.handle_list_snapshots),
                 (GetSnapshotInfoReqInput, self.handle_get_snapshot_info),
+                (RestoreSnapshotReqInput, self.handle_restore_snapshot),
+                (DeleteSnapshotReqInput, self.handle_delete_snapshot),
             ]
         )
 

@@ -102,6 +102,8 @@ from sglang.srt.managers.io_struct import (
     EmbeddingReqInput,
     GenerateReqInput,
     GetSnapshotInfoReqInput,
+    RestoreSnapshotReqInput,
+    DeleteSnapshotReqInput,
     GetWeightsByNameReqInput,
     InitWeightsSendGroupForRemoteInstanceReqInput,
     InitWeightsUpdateGroupReqInput,
@@ -1206,6 +1208,71 @@ async def get_snapshot_info(obj: GetSnapshotInfoReqInput, request: Request):
             {
                 "success": False,
                 "message": f"Error getting snapshot info: {str(e)}",
+            },
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+        )
+
+
+@app.post("/restore_snapshot")
+@auth_level(AuthLevel.ADMIN_OPTIONAL)
+async def restore_snapshot(obj: RestoreSnapshotReqInput, request: Request):
+    """Restore Mamba state from a snapshot."""
+    try:
+        result = await _global_state.tokenizer_manager.restore_snapshot(obj)
+        if result.success:
+            return ORJSONResponse(
+                {
+                    "success": True,
+                    "message": result.message,
+                    "token_count": result.token_count,
+                },
+                status_code=HTTPStatus.OK,
+            )
+        else:
+            return ORJSONResponse(
+                {
+                    "success": False,
+                    "message": result.message,
+                },
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+    except Exception as e:
+        return ORJSONResponse(
+            {
+                "success": False,
+                "message": f"Error restoring snapshot: {str(e)}",
+            },
+            status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
+        )
+
+
+@app.post("/delete_snapshot")
+@auth_level(AuthLevel.ADMIN_OPTIONAL)
+async def delete_snapshot(obj: DeleteSnapshotReqInput, request: Request):
+    """Delete a snapshot."""
+    try:
+        result = await _global_state.tokenizer_manager.delete_snapshot(obj)
+        if result.success:
+            return ORJSONResponse(
+                {
+                    "success": True,
+                    "message": result.message,
+                },
+                status_code=HTTPStatus.OK,
+            )
+        else:
+            return ORJSONResponse(
+                {
+                    "success": False,
+                    "message": result.message,
+                },
+                status_code=HTTPStatus.BAD_REQUEST,
+            )
+    except Exception as e:
+        return ORJSONResponse(
+            {
+                "success": False,
+                "message": f"Error deleting snapshot: {str(e)}",
             },
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
         )
