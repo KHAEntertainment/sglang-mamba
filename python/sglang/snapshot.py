@@ -182,7 +182,6 @@ class SnapshotManager:
         Raises:
             ValueError: If neither turn_number nor branch_name is specified
             RuntimeError: If restore fails (snapshot not found, request not found, etc.)
-            FileNotFoundError: If the snapshot doesn't exist
 
         Example:
             ```python
@@ -222,6 +221,8 @@ class SnapshotManager:
             if not result.get('success'):
                 raise RuntimeError(f"Restore failed: {result.get('message')}")
             return result
+        except RuntimeError:
+            raise
         except Exception as e:
             raise RuntimeError(f"Failed to restore snapshot: {e}") from e
 

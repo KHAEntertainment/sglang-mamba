@@ -53,7 +53,7 @@ ls python/sglang/test/srt/layers/mamba/
 # __init__.py, conftest.py present
 
 # Test fixtures importable
-python -c "import python.sglang.test.srt.layers.mamba.conftest"
+python -c "import sys; sys.path.insert(0, 'python'); import sglang.test.srt.layers.mamba.conftest"
 # No errors
 ```
 

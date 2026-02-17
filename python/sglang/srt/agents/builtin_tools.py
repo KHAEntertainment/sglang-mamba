@@ -117,6 +117,8 @@ class SafeExpressionEvaluator(ast.NodeVisitor):
         # Evaluate AST
         return self.visit(tree.body)
 
+    _MAX_EXPONENT = 1000
+
     def visit_BinOp(self, node):
         """Handle binary operations (+, -, *, /, etc.)."""
         op_class = type(node.op)
@@ -125,6 +127,11 @@ class SafeExpressionEvaluator(ast.NodeVisitor):
 
         left = self.visit(node.left)
         right = self.visit(node.right)
+
+        # Guard against DoS via huge exponentiation (e.g. 2**1000000)
+        if op_class is ast.Pow and isinstance(right, (int, float)) and abs(right) > self._MAX_EXPONENT:
+            raise ValueError(f"Exponent magnitude too large (max {self._MAX_EXPONENT})")
+
         return self.BINARY_OPS[op_class](left, right)
 
     def visit_UnaryOp(self, node):

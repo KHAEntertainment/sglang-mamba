@@ -2,8 +2,8 @@
 
 > **⚠️ Implementation Status:** Phase 1 (Snapshot Saving) is complete. Phase 2 (State Restoration) is in development.
 >
-> **Available Now:** `save_snapshot()`, `list_snapshots()`, `get_snapshot_info()`
-> **Coming Soon:** `restore_snapshot()`, `SnapshotManager` wrapper
+> **Available Now:** `save_snapshot()`, `list_snapshots()`
+> **Coming Soon:** `restore_snapshot()`, `get_snapshot_info()`, `SnapshotManager` wrapper
 
 Common issues and solutions for the snapshot system.
 
@@ -22,10 +22,10 @@ The current implementation (Phase 1) provides snapshot **saving and inspection o
 **What works:**
 - ✅ `s.save_snapshot()` - Save current state
 - ✅ `s.list_snapshots()` - List saved snapshots
-- ✅ `s.get_snapshot_info()` - Get snapshot metadata
 
 **What doesn't work yet (Phase 2):**
 - ❌ `s.restore_snapshot()` - State restoration
+- ❌ `s.get_snapshot_info()` - Snapshot metadata lookup
 - ❌ `SnapshotManager` class - High-level API
 - ❌ Programmatic snapshot management
 
@@ -58,11 +58,11 @@ python -m sglang.launch_server --enable-snapshot-persistence  # ✅
 
 ---
 
-### Issue: Snapshot Metadata Not Found
+### Issue: Snapshot Not Found
 
-**Symptom**: `get_snapshot_info()` returns empty or missing information.
+**Symptom**: `list_snapshots()` returns an empty list or a snapshot you expect to be there is missing.
 
-**Cause**: Snapshot doesn't exist or wrong conversation_id/turn_number used.
+**Cause**: Snapshot wasn't saved, or wrong conversation_id used.
 
 **Solution**:
 
@@ -70,14 +70,15 @@ python -m sglang.launch_server --enable-snapshot-persistence  # ✅
 # List all snapshots to see what's available
 snapshots = s.list_snapshots()
 for snap in snapshots:
-    print(f"Conversation: {snap['conversation_id']}, Turn: {snap['turn_number']}")
+    print(f"Turn: {snap['turn_number']}, Tokens: {snap['token_count']}")
 
-# Get info with correct identifiers
-info = s.get_snapshot_info(
-    conversation_id="correct_id",
-    turn_number=0
-)
+# Ensure save_snapshot() was called before listing
+snap_id = s.save_snapshot()
+snapshots = s.list_snapshots()
+print(f"Saved snap_id={snap_id}, total={len(snapshots)}")
 ```
+
+> **Note:** `get_snapshot_info()` for querying individual snapshot metadata is planned for Phase 2.
 
 ---
 

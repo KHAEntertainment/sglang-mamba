@@ -172,7 +172,8 @@ class ToolExecutionEngine:
                 )
                 conversation_context = {}
 
-            parameters["_conversation_context"] = conversation_context
+            # Copy to avoid mutating the caller's dict
+            parameters = {**parameters, "_conversation_context": conversation_context}
 
         # Execute tool
         try:

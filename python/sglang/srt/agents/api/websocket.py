@@ -309,6 +309,13 @@ async def handle_websocket_connection(
             if command == "execute_tool":
                 # Execute tool with streaming
                 tool_name = data.get("tool_name")
+                if not tool_name:
+                    await ws_manager.send_to_connection(
+                        connection_id,
+                        WebSocketEventType.ERROR,
+                        {"error": "tool_name is required for execute_tool command"},
+                    )
+                    continue
                 parameters = data.get("parameters", {})
                 conversation_id = data.get("conversation_id")
 

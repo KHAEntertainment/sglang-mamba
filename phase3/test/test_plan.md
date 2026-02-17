@@ -72,32 +72,32 @@ Tests:
 **Location:** `python/sglang/test/srt/`
 
 #### 2.1 Scheduler Integration
-**File:** `test_mamba_scheduler_integration.py`
+**File:** `test_mamba_scheduler_integration.py` *(planned — not yet written)*
 
 Tests:
-- ✅ `test_scheduler_creates_mamba_batch()` - Scheduler creates MambaScheduleBatch
-- ✅ `test_scheduler_handles_mamba_states()` - State allocation in ReqToTokenPool
-- ✅ `test_scheduler_prefill_decode_transition()` - Prefill → Decode state transition
-- ✅ `test_scheduler_multiple_requests()` - Multiple concurrent Mamba requests
-- ✅ `test_scheduler_mixed_models()` - Mamba + Transformer in same server (future)
+- ⬜ `test_scheduler_creates_mamba_batch()` - Scheduler creates MambaScheduleBatch
+- ⬜ `test_scheduler_handles_mamba_states()` - State allocation in ReqToTokenPool
+- ⬜ `test_scheduler_prefill_decode_transition()` - Prefill → Decode state transition
+- ⬜ `test_scheduler_multiple_requests()` - Multiple concurrent Mamba requests
+- ⬜ `test_scheduler_mixed_models()` - Mamba + Transformer in same server (future)
 
 #### 2.2 ModelRunner Integration
-**File:** `test_mamba_model_runner_integration.py`
+**File:** `test_mamba_model_runner_integration.py` *(planned — not yet written)*
 
 Tests:
-- ✅ `test_model_runner_forward_pass()` - ModelRunner.forward() with Mamba
-- ✅ `test_model_runner_state_management()` - ModelRunner manages states
-- ✅ `test_model_runner_batch_processing()` - Batched inference
-- ✅ `test_model_runner_tp_parallelism()` - Tensor parallel Mamba (future)
+- ⬜ `test_model_runner_forward_pass()` - ModelRunner.forward() with Mamba
+- ⬜ `test_model_runner_state_management()` - ModelRunner manages states
+- ⬜ `test_model_runner_batch_processing()` - Batched inference
+- ⬜ `test_model_runner_tp_parallelism()` - Tensor parallel Mamba (future)
 
 #### 2.3 Memory Management Integration
-**File:** `test_mamba_memory_integration.py`
+**File:** `test_mamba_memory_integration.py` *(planned — not yet written)*
 
 Tests:
-- ✅ `test_memory_allocation()` - States allocated in ReqToTokenPool
-- ✅ `test_memory_deallocation()` - States freed on request completion
-- ✅ `test_memory_fragmentation()` - No excessive fragmentation
-- ✅ `test_memory_limits()` - Graceful handling of OOM
+- ⬜ `test_memory_allocation()` - States allocated in ReqToTokenPool
+- ⬜ `test_memory_deallocation()` - States freed on request completion
+- ⬜ `test_memory_fragmentation()` - No excessive fragmentation
+- ⬜ `test_memory_limits()` - Graceful handling of OOM
 
 ---
 
@@ -106,32 +106,32 @@ Tests:
 **Location:** `python/sglang/test/srt/`
 
 #### 3.1 Full Pipeline Tests
-**File:** `test_mamba_e2e.py`
+**File:** `test_mamba_e2e.py` *(planned — not yet written)*
 
 Tests:
-- ✅ `test_mamba_inference_pipeline()` - Full tokenize → forward → detokenize
-- ✅ `test_mamba_streaming_generation()` - Streaming output
-- ✅ `test_mamba_batch_generation()` - Multiple requests in parallel
-- ✅ `test_mamba_long_context()` - Sequences > 8K tokens
-- ✅ `test_mamba_with_sampling()` - Temperature, top-k, top-p sampling
+- ⬜ `test_mamba_inference_pipeline()` - Full tokenize → forward → detokenize
+- ⬜ `test_mamba_streaming_generation()` - Streaming output
+- ⬜ `test_mamba_batch_generation()` - Multiple requests in parallel
+- ⬜ `test_mamba_long_context()` - Sequences > 8K tokens
+- ⬜ `test_mamba_with_sampling()` - Temperature, top-k, top-p sampling
 
 #### 3.2 Prefill Cache E2E
-**File:** `test_mamba_cache_e2e.py`
+**File:** `test_mamba_cache_e2e.py` *(planned — not yet written)*
 
 Tests:
-- ✅ `test_cache_hit_latency_improvement()` - 2nd request faster with cache
-- ✅ `test_cache_miss_fallback()` - Correct output on cache miss
-- ✅ `test_cache_hit_rate_measurement()` - Cache metrics tracked
-- ✅ `test_multi_turn_conversation()` - Conversation with shared prefix
+- ⬜ `test_cache_hit_latency_improvement()` - 2nd request faster with cache
+- ⬜ `test_cache_miss_fallback()` - Correct output on cache miss
+- ⬜ `test_cache_hit_rate_measurement()` - Cache metrics tracked
+- ⬜ `test_multi_turn_conversation()` - Conversation with shared prefix
 
 #### 3.3 Performance Tests
-**File:** `test_mamba_performance.py`
+**File:** `test_mamba_performance.py` *(planned — not yet written)*
 
 Tests:
-- ✅ `test_throughput_tokens_per_sec()` - Throughput benchmark
-- ✅ `test_latency_percentiles()` - p50, p95, p99 latency
-- ✅ `test_memory_usage()` - Peak memory consumption
-- ✅ `test_batch_size_scaling()` - Linear scaling with batch size
+- ⬜ `test_throughput_tokens_per_sec()` - Throughput benchmark
+- ⬜ `test_latency_percentiles()` - p50, p95, p99 latency
+- ⬜ `test_memory_usage()` - Peak memory consumption
+- ⬜ `test_batch_size_scaling()` - Linear scaling with batch size
 
 ---
 
