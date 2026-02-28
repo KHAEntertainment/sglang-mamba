@@ -1,9 +1,10 @@
 # Troubleshooting Guide: Stateful Mamba Snapshots
 
-> **⚠️ Implementation Status:** Snapshot save/restore/list/get/delete are all available via `SnapshotManager`.
+> **⚠️ Implementation Status:** Two API surfaces are available for snapshot operations.
 >
-> **Available Now:** `save_snapshot()`, `list_snapshots()`, `SnapshotManager` (with restore/get_info/delete methods)
-> **Coming Soon:** Direct state object methods `s.restore_snapshot()`, `s.get_snapshot_info()` (use `SnapshotManager` instead)
+> **Direct state methods (available now):** `s.save_snapshot()`, `s.list_snapshots()`
+> **SnapshotManager methods (available now):** `SnapshotManager.restore()`, `SnapshotManager.get_info()`, `SnapshotManager.delete()`
+> **Coming soon:** Direct state methods `s.restore_snapshot()`, `s.get_snapshot_info()`
 
 Common issues and solutions for the snapshot system.
 
@@ -17,16 +18,18 @@ Common issues and solutions for the snapshot system.
 
 ## Current Limitations
 
-All snapshot operations (save/restore/list/get/delete) are available via `SnapshotManager`.
+Snapshot operations use two API surfaces: direct state methods for save/list, and `SnapshotManager` for restore/get_info/delete.
 
-**What works:**
-- ✅ `s.save_snapshot()` - Save current state (direct method)
-- ✅ `s.list_snapshots()` - List saved snapshots (via endpoint)
-- ✅ `SnapshotManager` class - Full API: `sm.restore()`, `sm.get_info()`, `sm.delete()`
+**What works now:**
+- ✅ `s.save_snapshot()` - Save current state (direct state method)
+- ✅ `s.list_snapshots()` - List saved snapshots (direct state method)
+- ✅ `SnapshotManager(runtime.endpoint).restore(snapshot_id)` - Restore a snapshot
+- ✅ `SnapshotManager(runtime.endpoint).get_info(snapshot_id)` - Get snapshot metadata
+- ✅ `SnapshotManager(runtime.endpoint).delete(snapshot_id)` - Delete a snapshot
 
-**What doesn't work yet (direct state object methods):**
-- ❌ `s.restore_snapshot()` - Use `SnapshotManager(runtime.endpoint).restore(snapshot_id)` instead
-- ❌ `s.get_snapshot_info()` - Use `SnapshotManager(runtime.endpoint).get_info(snapshot_id)` instead
+**What doesn't work yet:**
+- ❌ `s.restore_snapshot()` - Direct state method not yet implemented (use `SnapshotManager` instead)
+- ❌ `s.get_snapshot_info()` - Direct state method not yet implemented (use `SnapshotManager` instead)
 - ❌ Automatic snapshot management (retention policies, lifecycle hooks)
 
 ## Common Issues
