@@ -151,11 +151,8 @@ Fixtures created:
 ## Test Infrastructure
 
 ### Pytest Configuration
-**File:** `python/sglang/test/pytest.ini` (to be created if missing)
-
-```ini
 [pytest]
-testpaths = python/sglang/test
+testpaths = .
 python_files = test_*.py
 python_classes = Test*
 python_functions = test_*
