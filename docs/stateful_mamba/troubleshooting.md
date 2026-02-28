@@ -9,7 +9,7 @@ Common issues and solutions for the snapshot system.
 
 ## Table of Contents
 
-- [Phase 1 Limitations](#phase-1-limitations)
+- [Current Limitations](#current-limitations)
 - [Common Issues](#common-issues)
 - [Error Messages](#error-messages)
 - [Memory Problems](#memory-problems)
@@ -25,8 +25,8 @@ All snapshot operations (save/restore/list/get/delete) are available via `Snapsh
 - ✅ `SnapshotManager` class - Full API: `sm.restore()`, `sm.get_info()`, `sm.delete()`
 
 **What doesn't work yet (direct state object methods):**
-- ❌ `s.restore_snapshot()` - Use `SnapshotManager(runtime, s).restore(snapshot_id)` instead
-- ❌ `s.get_snapshot_info()` - Use `SnapshotManager(runtime, s).get_info(snapshot_id)` instead
+- ❌ `s.restore_snapshot()` - Use `SnapshotManager(runtime.endpoint).restore(snapshot_id)` instead
+- ❌ `s.get_snapshot_info()` - Use `SnapshotManager(runtime.endpoint).get_info(snapshot_id)` instead
 - ❌ Automatic snapshot management (retention policies, lifecycle hooks)
 
 ## Common Issues

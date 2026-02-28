@@ -64,7 +64,7 @@ class SafeExpressionEvaluator(ast.NodeVisitor):
         "round": round,
         "min": min,
         "max": max,
-        "pow": lambda base, exp: SafeExpressionEvaluator._safe_pow(base, exp),
+        "pow": lambda base, exp, mod=None: SafeExpressionEvaluator._safe_pow(base, exp, mod),
         "sqrt": math.sqrt,
         "sin": math.sin,
         "cos": math.cos,
@@ -120,22 +120,25 @@ class SafeExpressionEvaluator(ast.NodeVisitor):
     _MAX_EXPONENT = 1000
 
     @classmethod
-    def _safe_pow(cls, base, exp):
+    def _safe_pow(cls, base, exp, mod=None):
         """
         Guarded power function that prevents DoS via huge exponents.
 
         Args:
             base: Base value
             exp: Exponent value
+            mod: Optional modulus for modular exponentiation
 
         Returns:
-            base ** exp
+            base ** exp (or pow(base, exp, mod) if mod is provided)
 
         Raises:
             ValueError: If exponent magnitude exceeds safety limit
         """
         if isinstance(exp, (int, float)) and abs(exp) > cls._MAX_EXPONENT:
             raise ValueError(f"Exponent magnitude too large (max {cls._MAX_EXPONENT})")
+        if mod is not None:
+            return pow(base, exp, mod)
         return operator.pow(base, exp)
 
     def visit_BinOp(self, node):

@@ -318,9 +318,14 @@ class ToolExecutionEngine:
         """
         logger.debug(f"Executing async tool: {tool.name}")
 
+        # Check if we're already in an event loop (narrow RuntimeError catch)
         try:
-            # Check if we're already in an event loop
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
+            in_event_loop = True
+        except RuntimeError:
+            in_event_loop = False
+
+        if in_event_loop:
             # Already in async context - must use thread pool to avoid RuntimeError
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -330,7 +335,7 @@ class ToolExecutionEngine:
                     )
                 )
                 return future.result(timeout=timeout)
-        except RuntimeError:
+        else:
             # No running loop - safe to create and use one
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
