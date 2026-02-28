@@ -109,7 +109,7 @@ class SnapshotManager:
         except Exception as e:
             raise RuntimeError(f"Failed to list snapshots: {e}") from e
 
-    def get_info(
+def get_info(
         self,
         conversation_id: str,
         turn_number: Optional[int] = None,
@@ -127,32 +127,10 @@ class SnapshotManager:
             Snapshot metadata dictionary with all available information
 
         Raises:
-            FileNotFoundError: If the snapshot doesn't exist
             ValueError: If neither turn_number nor branch_name is specified
+            RuntimeError: If the snapshot doesn't exist or another error occurs
 
         Example:
-            ```python
-            # Get info for turn 5
-            info = sm.get_info("conv_123", turn_number=5)
-            print(f"Saved at: {info['timestamp']}")
-
-            # Get info for a branch
-            info = sm.get_info("conv_123", branch_name="alternative")
-            ```
-        """
-        if turn_number is None and branch_name is None:
-            raise ValueError(
-                "Must specify either turn_number or branch_name"
-            )
-
-        try:
-            return self.endpoint.get_snapshot_info(
-                conversation_id=conversation_id,
-                turn_number=turn_number,
-                branch_name=branch_name,
-            )
-        except Exception as e:
-            raise RuntimeError(f"Failed to get snapshot info: {e}") from e
 
     def restore(
         self,
