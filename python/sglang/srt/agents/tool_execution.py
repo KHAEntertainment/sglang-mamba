@@ -6,6 +6,7 @@ and execution tracking.
 """
 
 import asyncio
+import concurrent.futures
 import logging
 import re
 import threading
@@ -285,7 +286,6 @@ class ToolExecutionEngine:
         """
         logger.debug(f"Executing sync tool: {tool.name}")
 
-        import concurrent.futures
         executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
         future = executor.submit(tool.function, **parameters)
         try:
@@ -327,20 +327,21 @@ class ToolExecutionEngine:
 
         if in_event_loop:
             # Already in async context - must use thread pool to avoid RuntimeError
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(
-                    lambda: asyncio.run(
-                        asyncio.wait_for(tool.function(**parameters), timeout=timeout)
-                    )
+            executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+            future = executor.submit(
+                lambda: asyncio.run(
+                    asyncio.wait_for(tool.function(**parameters), timeout=timeout)
                 )
-                try:
-                    return future.result(timeout=timeout)
-                except (concurrent.futures.TimeoutError, asyncio.TimeoutError):
-                    # Python 3.9/3.10: these are distinct types; normalize to built-in
-                    raise TimeoutError(
-                        f"Tool '{tool.name}' execution exceeded timeout of {timeout}s"
-                    )
+            )
+            try:
+                return future.result(timeout=timeout)
+            except (concurrent.futures.TimeoutError, asyncio.TimeoutError):
+                # Python 3.9/3.10: these are distinct types; normalize to built-in
+                raise TimeoutError(
+                    f"Tool '{tool.name}' execution exceeded timeout of {timeout}s"
+                )
+            finally:
+                executor.shutdown(wait=False, cancel_futures=True)
         else:
             # No running loop - safe to create and use one
             loop = asyncio.new_event_loop()
