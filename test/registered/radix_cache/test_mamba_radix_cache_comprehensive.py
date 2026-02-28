@@ -483,7 +483,7 @@ class TestMambaRadixCacheComprehensive(unittest.TestCase):
         match_result = self.cache.match_prefix(MatchPrefixParams(key=RadixKey(token_ids_2)))
         # mamba_branching_seqlen should be set because there's a tombstone in the path
         # The exact value depends on mamba_cache_chunk_size
-
+        self.assertIsNotNone(match_result.mamba_branching_seqlen)
 
 if __name__ == "__main__":
     unittest.main()
