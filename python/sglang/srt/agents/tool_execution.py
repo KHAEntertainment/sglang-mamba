@@ -328,13 +328,19 @@ class ToolExecutionEngine:
         if in_event_loop:
             # Already in async context - must use thread pool to avoid RuntimeError
             import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor() as executor:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
                 future = executor.submit(
                     lambda: asyncio.run(
                         asyncio.wait_for(tool.function(**parameters), timeout=timeout)
                     )
                 )
-                return future.result(timeout=timeout)
+                try:
+                    return future.result(timeout=timeout)
+                except (concurrent.futures.TimeoutError, asyncio.TimeoutError):
+                    # Python 3.9/3.10: these are distinct types; normalize to built-in
+                    raise TimeoutError(
+                        f"Tool '{tool.name}' execution exceeded timeout of {timeout}s"
+                    )
         else:
             # No running loop - safe to create and use one
             loop = asyncio.new_event_loop()
@@ -342,6 +348,11 @@ class ToolExecutionEngine:
             try:
                 return loop.run_until_complete(
                     asyncio.wait_for(tool.function(**parameters), timeout=timeout)
+                )
+            except asyncio.TimeoutError:
+                # Python 3.9/3.10: asyncio.TimeoutError is distinct; normalize to built-in
+                raise TimeoutError(
+                    f"Tool '{tool.name}' execution exceeded timeout of {timeout}s"
                 )
             finally:
                 loop.close()

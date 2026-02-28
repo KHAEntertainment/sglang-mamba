@@ -78,7 +78,7 @@ snapshots = s.list_snapshots()
 print(f"Saved snap_id={snap_id}, total={len(snapshots)}")
 ```
 
-> **Note:** `get_snapshot_info()` for querying individual snapshot metadata is planned for Phase 2.
+> **Note:** To query individual snapshot metadata, use `SnapshotManager(runtime.endpoint).get_info(snapshot_id)`. Direct state method `s.get_snapshot_info()` is coming soon.
 
 ---
 
@@ -220,9 +220,9 @@ for snap in snapshots:
 
 ---
 
-### Q: Can I restore snapshots in Phase 1?
+### Q: Can I restore snapshots?
 
-**A**: No, Phase 1 only supports saving and inspecting snapshots. Restoration will be available in Phase 2.
+**A**: Yes! Use `SnapshotManager(runtime.endpoint).restore(snapshot_id)` to restore any saved snapshot. The direct state method `s.restore_snapshot()` is coming soon.
 
 ---
 
