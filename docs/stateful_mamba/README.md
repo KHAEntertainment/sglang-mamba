@@ -105,7 +105,7 @@ The snapshots are saved in safetensors format with JSON metadata.
 
 The snapshot system integrates with SGLang's existing Mamba infrastructure:
 
-```
+```text
 ┌─────────────────────────────────────────────────────┐
 │              Frontend (Language API)                 │
 │  Phase 1: save_snapshot(), list_snapshots()         │

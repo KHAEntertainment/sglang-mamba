@@ -24,7 +24,7 @@ import statistics
 import sys
 import time
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List
 
 import torch
 
@@ -370,7 +370,7 @@ class MambaRadixCacheBenchmark:
         print("\n" + "=" * 70)
         print("MambaRadixCache Performance Benchmark Suite")
         print("=" * 70)
-        print(f"Configuration:")
+        print("Configuration:")
         print(f"  KV Cache Size:    {self.kv_cache_size}")
         print(f"  Mamba Cache Size: {self.mamba_cache_size}")
         print(f"  Max Requests:     {self.max_num_reqs}")
@@ -432,6 +432,9 @@ def main():
     )
     parser.add_argument(
         "--mamba-cache-size", type=int, default=128, help="Mamba cache size"
+    )
+    parser.add_argument(
+        "--iterations", type=int, default=10000, help="Number of iterations to run"
     )
     args = parser.parse_args()
 

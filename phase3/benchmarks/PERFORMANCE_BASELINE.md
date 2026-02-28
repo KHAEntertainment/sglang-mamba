@@ -56,7 +56,7 @@
 
 **Workload:** 1,000 sequences, 10 tokens each
 
-```
+```text
 Expected Results (placeholder - run benchmark to fill):
 - Average Latency: TBD ms
 - P50 Latency: TBD ms
@@ -74,7 +74,7 @@ Expected Results (placeholder - run benchmark to fill):
 
 **Workload:** 10,000 queries on 100 cached sequences
 
-```
+```text
 Expected Results (placeholder - run benchmark to fill):
 - Average Latency: TBD ms
 - P50 Latency: TBD ms
@@ -93,7 +93,7 @@ Expected Results (placeholder - run benchmark to fill):
 
 **Workload:** 1,000 evictions, 1 state each
 
-```
+```text
 Expected Results (placeholder - run benchmark to fill):
 - Average Latency: TBD ms
 - P50 Latency: TBD ms
@@ -111,7 +111,7 @@ Expected Results (placeholder - run benchmark to fill):
 
 **Workload:** 1,000 evictions, 1 token each
 
-```
+```text
 Expected Results (placeholder - run benchmark to fill):
 - Average Latency: TBD ms
 - P50 Latency: TBD ms

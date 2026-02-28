@@ -21,6 +21,48 @@ without requiring direct access to the RuntimeEndpoint internals.
 from typing import Dict, List, Optional
 
 
+__all__ = [
+    "SnapshotManager",
+    "SnapshotError",
+    "SnapshotDisabledError",
+    "SnapshotNotFoundError",
+    "SnapshotInvalidError",
+    "SnapshotInUseError",
+    "SnapshotDeserializationError",
+]
+
+
+# Snapshot-specific exceptions
+class SnapshotError(Exception):
+    """Base exception for snapshot operations."""
+    pass
+
+
+class SnapshotDisabledError(SnapshotError):
+    """Raised when snapshot operations are attempted but snapshots are not enabled."""
+    pass
+
+
+class SnapshotNotFoundError(SnapshotError):
+    """Raised when a requested snapshot ID doesn't exist."""
+    pass
+
+
+class SnapshotInvalidError(SnapshotError):
+    """Raised when a snapshot's state is corrupted or invalid."""
+    pass
+
+
+class SnapshotInUseError(SnapshotError):
+    """Raised when attempting to delete/modify a snapshot currently in use."""
+    pass
+
+
+class SnapshotDeserializationError(SnapshotError):
+    """Raised when snapshot file is corrupted or incompatible."""
+    pass
+
+
 class SnapshotManager:
     """
     High-level API for managing Mamba state snapshots.
