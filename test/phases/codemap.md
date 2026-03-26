@@ -1,6 +1,6 @@
 # SGLang-Mamba Codemap
 
-Navigation reference for all phases. Each entry gives the exact file, line range, and what lives there.
+Navigation reference for all phases. Each entry gives the approximate file, line range, and what lives there.
 
 ---
 

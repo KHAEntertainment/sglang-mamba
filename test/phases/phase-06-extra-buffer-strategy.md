@@ -166,9 +166,9 @@ class TestMambaExtraBufferUnit(unittest.TestCase):
             getattr(req, "mamba_ping_pong_track_buffer", None),
             "mamba_ping_pong_track_buffer should be allocated in extra_buffer mode"
         )
-        # Non-speculative: expect 2 slots (ping + pong)
+        # With speculative_num_draft_tokens=3: mamba_ping_pong_track_buffer_size = 1 (not 2)
         buf = req.mamba_ping_pong_track_buffer
-        self.assertGreaterEqual(len(buf), 2)
+        self.assertGreaterEqual(len(buf), 1)
         # Clean up
         self.pool.free_mamba_cache(req)
         self.pool.free(req)

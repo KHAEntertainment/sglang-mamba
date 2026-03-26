@@ -306,6 +306,6 @@ PHASE 4 RESULT: PASS | FAIL
 Tests run: 5  Passed: X  Failed: Y
 MambaRadixCache confirmed active: YES | NO
 CUDA errors in server log: NONE | <summary>
-HITL: PASS (5 turns, context persistent) | FAIL
+HITL: PASS (3-turn Web UI smoke check; no server-side context persistence — client history only) | FAIL
 Report: $RESULTS_DIR/phase-04-<model>-<date>.md
 ```
