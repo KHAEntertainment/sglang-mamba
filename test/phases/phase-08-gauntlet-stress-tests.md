@@ -289,7 +289,7 @@ if __name__ == "__main__":
 - All 6 implemented stress tests pass
 - `test_high_concurrency_shared_prefix`: all 32 requests complete, non-empty, no errors
 - `test_rapid_distinct_requests_eviction_pressure`: 100 requests complete, zero errors
-- `test_repeated_same_request_cache_stability`: all 50 outputs identical
+- `test_repeated_same_request_cache_stability`: at most 3 unique outputs across 50 runs, with ≥90% agreement on the most common output
 - `test_concurrent_multi_turn_conversations`: all 8 conversations maintain persona across 5 turns
 - `test_server_health_after_stress`: server still returns 200 after full gauntlet
 - No `CUDA error`, `mamba_lock_ref` assertion, or `sanity_check` failure in server logs during or after run

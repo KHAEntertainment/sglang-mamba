@@ -820,6 +820,17 @@ class EmbeddingReqInput(BaseReq, APIServingTimingMixin):
     # The uid of LoRA adaptors, should be initialized by tokenizer manager
     lora_id: Optional[Union[List[Optional[str]], Optional[str]]] = None
 
+    # Whether this is a cross-encoder (rerank) request
+    is_cross_encoder_request: bool = False
+    # Priority for the request
+    priority: Optional[int] = None
+    # Routing key for routing-key schedule policy
+    routing_key: Optional[str] = None
+    # The number of dimensions the resulting output embeddings should have (Matryoshka Embeddings)
+    dimensions: Optional[int] = None
+    # Propagates trace context via Engine.generate/async_generate
+    external_trace_header: Optional[Dict] = None
+
     def normalize_batch_and_arguments(self):
         # at least one of text, input_ids, or image should be provided
         if self.text is None and self.input_ids is None and self.image_data is None:

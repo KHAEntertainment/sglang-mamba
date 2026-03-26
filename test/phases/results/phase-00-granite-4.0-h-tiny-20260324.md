@@ -30,7 +30,7 @@
 
 ### 1. `test_full_cache_eviction`
 
-```
+```text
 test/registered/radix_cache/test_mamba_radix_cache_comprehensive.py::TestMambaRadixCacheComprehensive::test_full_cache_eviction FAILED
 
 self = <test_mamba_radix_cache_comprehensive.TestMambaRadixCacheComprehensive testMethod=test_full_cache_eviction>
@@ -54,7 +54,7 @@ test/registered/radix_cache/test_mamba_radix_cache_comprehensive.py:290: Attribu
 
 ### 2. `test_mamba_branching_seqlen`
 
-```
+```text
 test/registered/radix_cache/test_mamba_radix_cache_comprehensive.py::TestMambaRadixCacheComprehensive::test_mamba_branching_seqlen FAILED
 
 >       self.assertIsNotNone(

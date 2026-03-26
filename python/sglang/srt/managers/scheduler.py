@@ -1351,11 +1351,18 @@ class Scheduler(
                 from sglang.srt.sampling.sampling_params import SamplingParams
 
                 # Build origin_input_ids from metadata.fill_ids
-                if metadata.fill_ids is not None:
-                    origin_input_ids = metadata.fill_ids
-                else:
-                    # Fallback: create dummy IDs based on token_count
-                    origin_input_ids = [0] * (metadata.token_count or 0)
+                if metadata.fill_ids is None:
+                    # Snapshot lacks fill_ids — incompatible; fabricating tokens would
+                    # silently desync the token stream from the injected Mamba state.
+                    mamba_pool.free(new_pool_idx_scalar)
+                    return RestoreSnapshotReqOutput(
+                        success=False,
+                        message=(
+                            "Snapshot is incompatible: fill_ids missing. "
+                            "Re-run the original conversation to create a compatible snapshot."
+                        ),
+                    )
+                origin_input_ids = metadata.fill_ids
 
                 new_req = Req(
                     rid=new_rid,
@@ -1458,11 +1465,19 @@ class Scheduler(
                 conv_states, temporal_states, mamba_pool, req.mamba_pool_idx
             )
 
-            # Sync fill_ids from metadata to request
-            if metadata.fill_ids is not None:
-                req.fill_ids = torch.tensor(metadata.fill_ids, dtype=torch.int64, device='cuda')
-                req.origin_input_ids = req.fill_ids  # sync origin too
-                logger.info(f"Synced fill_ids after restore, len={len(metadata.fill_ids)}")
+            # Sync fill_ids from metadata to request; reject if missing to avoid
+            # silently desyncing the token stream from the injected Mamba state.
+            if metadata.fill_ids is None:
+                return RestoreSnapshotReqOutput(
+                    success=False,
+                    message=(
+                        "Snapshot is incompatible: fill_ids missing. "
+                        "Re-run the original conversation to create a compatible snapshot."
+                    ),
+                )
+            req.fill_ids = torch.tensor(metadata.fill_ids, dtype=torch.int64, device='cuda')
+            req.origin_input_ids = req.fill_ids  # sync origin too
+            logger.info(f"Synced fill_ids after restore, len={len(metadata.fill_ids)}")
 
             logger.info(
                 f"Snapshot restored: conversation={recv_req.conversation_id}, "

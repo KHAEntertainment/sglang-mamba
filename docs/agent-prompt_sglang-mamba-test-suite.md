@@ -1305,7 +1305,7 @@ python test/run_suite.py --hw cuda --suite nightly-1-gpu --nightly
 python test/run_suite.py --hw cuda --suite stage-b-test-small-1-gpu \
     --auto-partition-id 0 --auto-partition-size 4
 ```
-```
+```text
 
 **File:** python/sglang/srt/snapshot/tier_manager.py (L1-1)
 ```python

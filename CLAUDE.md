@@ -171,9 +171,9 @@ Cloudflare tunnel: `<TUNNEL_HOST>` → `localhost:30000`
 
 | Model | Path | Type | Use Case |
 |-------|------|------|----------|
-| granite-4.0-h-tiny | `/home/jeanclawdai/models/granite-4.0-h-tiny` | FP16, 40-layer hybrid | Primary (try first) |
-| Nemotron-4B | `/home/jeanclawdai/models/NVIDIA-Nemotron-3-Nano-4B-BF16` | FP16, 4B | Backup if granite OOMs |
-| Granite-Q4 | `/home/jeanclawdai/models/granite-4.0-h-tiny-gguf/granite-4.0-h-tiny-Q4_K_M.gguf` | GGUF Q4 | Quantized comparison (args TBD) |
+| granite-4.0-h-tiny | `<MODEL_DIR>/granite-4.0-h-tiny` | FP16, 40-layer hybrid | Primary (try first) |
+| Nemotron-4B | `<MODEL_DIR>/NVIDIA-Nemotron-3-Nano-4B-BF16` | FP16, 4B | Backup if granite OOMs |
+| Granite-Q4 | `<MODEL_DIR>/granite-4.0-h-tiny-gguf/granite-4.0-h-tiny-Q4_K_M.gguf` | GGUF Q4 | Quantized comparison (args TBD) |
 
 **Testing priority:** granite-4.0-h-tiny → Nemotron (if OOM) → Granite-Q4 (comparison pass)
 
@@ -186,5 +186,5 @@ Cloudflare tunnel: `<TUNNEL_HOST>` → `localhost:30000`
 ## Memory Context
 
 For session persistence, important project context is stored in:
-- Global memory: `~/.claude/projects/-Users-bbrenner-sglang-mamba/memory/`
+- Global memory: `~/.claude/projects/<PROJECT_PATH>/memory/`
 - Session ID for this project: `sglang-mamba-session-001`

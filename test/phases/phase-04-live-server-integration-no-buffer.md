@@ -95,8 +95,19 @@ curl -s http://localhost:$SERVER_PORT/v1/chat/completions \
   -d "{\"model\":\"default\",\"messages\":$(echo $LONG_PREFIX | python3 -c \"import sys,json; m=json.load(sys.stdin); m.append({'role':'user','content':'What is 2+2?'}); print(json.dumps(m))\"),\"temperature\":0,\"max_tokens\":10}" \
   2>&1 | tee /tmp/phase4_req_b.json
 
-# Confirm cache hit in server logs
-grep -i "cache_hit\|prefix_len\|radix\|hit" /tmp/phase4_server.log | tail -10
+# Check server log for MambaRadixCache activity
+grep -i "MambaRadixCache\|mamba_lock\|evict" /tmp/phase4_server.log | tail -10
+# Cache-hit evidence: check num_cached_tokens in response meta_info
+python3 -c "
+import json
+for name, path in [('A', '/tmp/phase4_req_a.json'), ('B', '/tmp/phase4_req_b.json')]:
+    try:
+        data = json.load(open(path))
+        meta = data.get('meta_info', {})
+        print(f'Request {name}: cached_tokens={meta.get(\"num_cached_tokens\", \"N/A\")}, prompt_tokens={data.get(\"usage\", {}).get(\"prompt_tokens\", \"N/A\")}')
+    except Exception as e:
+        print(f'Request {name}: could not parse ({e})')
+"
 ```
 
 **Part B — Web UI smoke check** (functional end-to-end only, not a state isolation proof):
@@ -112,7 +123,7 @@ Open **http://localhost:3000**, select **SGLang Local**. Have a 3-turn conversat
 ### Task 4: Inspect server logs for eviction and cache activity
 
 ```bash
-grep -i "evict\|cache_hit\|radix\|mamba_lock\|oom\|cuda error" /tmp/phase4_server.log | tail -50
+grep -i "evict\|radix\|mamba_lock\|oom\|cuda error" /tmp/phase4_server.log | tail -50
 ```
 
 ### Task 5: Shut down server

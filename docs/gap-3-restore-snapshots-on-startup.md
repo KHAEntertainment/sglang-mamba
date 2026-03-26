@@ -2,13 +2,13 @@
 
 ## Status
 
-**Stub only** — currently only logs found snapshots, does not restore any state.
+**Stub only** — only logs found snapshots, does not restore any state.
 
 ---
 
 ## Context
 
-After PR [#4](https://github.com/KHAEntertainment/sglang-mamba/pull/4) merged two critical fixes:
+After PR [#4](https://github.com/KHAEntertainment/sglang-mamba/pull/4) introduces two critical fixes:
 
 1. **Gap 1 (FIXED)**: `fill_ids` sync after restore — `MambaSnapshotMetadata` now stores `fill_ids`, captured at save time and restored to `req.fill_ids` + `req.origin_input_ids` after injection ([scheduler.py:1439-1443](python/sglang/srt/managers/scheduler.py#L1439-L1443))
 2. **Gap 2 (FIXED)**: `create_new_request=True` — `POST /restore_snapshot` with `create_new_request: true` creates a new request backed by restored state, returning a fresh `rid` ([scheduler.py:1311-1385](python/sglang/srt/managers/scheduler.py#L1311-L1385))
