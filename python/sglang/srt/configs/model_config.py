@@ -53,7 +53,7 @@ class ModelImpl(str, Enum):
 
 def is_deepseek_nsa(config: PretrainedConfig) -> bool:
     return (
-        config.architectures is not None
+        config.architectures
         and config.architectures[0]
         in [
             "DeepseekV3ForCausalLM",
@@ -131,6 +131,9 @@ class ModelConfig:
             model_override_args=self.model_override_args,
             **kwargs,
         )
+        # Normalize architectures to empty list for models that don't have it (e.g., Mamba)
+        if self.hf_config.architectures is None:
+            self.hf_config.architectures = []
         self.hf_text_config = get_hf_text_config(self.hf_config)
         self.hf_generation_config = get_generation_config(
             self.model_path,
@@ -146,7 +149,10 @@ class ModelConfig:
                 "Llama4ForConditionalGeneration",
                 "Step3VLForConditionalGeneration",
             ]
-            if self.hf_config.architectures[0] in mm_disabled_models:
+            if (
+                self.hf_config.architectures
+                and self.hf_config.architectures[0] in mm_disabled_models
+            ):
                 enable_multimodal = False
                 logger.info(
                     f"Multimodal is disabled for {self.hf_config.model_type}. To enable it, set --enable-multimodal."
