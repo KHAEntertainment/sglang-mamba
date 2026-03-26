@@ -19,6 +19,7 @@ import os
 import signal
 import sys
 import time
+import uuid
 from collections import deque
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -1161,6 +1162,7 @@ class Scheduler(
                 mamba_pool_idx=req.mamba_pool_idx,
                 req_pool_idx=req.req_pool_idx,
                 layer_config=layer_config,
+                fill_ids=req.fill_ids.tolist() if hasattr(req, "fill_ids") and req.fill_ids is not None else None,
             )
 
             # Save snapshot
@@ -1308,10 +1310,79 @@ class Scheduler(
 
         # Note: create_new_request is deferred to Phase 3
         if recv_req.create_new_request:
-            return RestoreSnapshotReqOutput(
-                success=False,
-                message="create_new_request is not yet implemented (Phase 3)"
-            )
+            try:
+                # Get mamba_pool from req_to_token_pool
+                mamba_pool = getattr(self.req_to_token_pool, "mamba_pool", None)
+                if mamba_pool is None:
+                    return RestoreSnapshotReqOutput(
+                        success=False,
+                        message="Mamba pool not available"
+                    )
+
+                # Load snapshot from disk
+                conv_states, temporal_states, metadata = self.snapshot_manager.load_snapshot(
+                    recv_req.conversation_id,
+                    recv_req.turn_number,
+                    recv_req.branch_name
+                )
+
+                # Allocate a new Mamba pool slot
+                new_pool_idx = mamba_pool.alloc(1)
+                if new_pool_idx is None:
+                    return RestoreSnapshotReqOutput(
+                        success=False,
+                        message="No free Mamba pool slots available"
+                    )
+
+                # new_pool_idx is a tensor, get scalar
+                new_pool_idx_scalar = new_pool_idx.item()
+
+                # Inject state into the new pool slot
+                self.snapshot_manager.inject_state_to_pool(
+                    conv_states, temporal_states, mamba_pool, new_pool_idx_scalar
+                )
+
+                # Create new request ID
+                new_rid = f"restored-{uuid.uuid4().hex[:8]}"
+
+                # Create minimal Req object
+                # We need to import Req here to avoid circular imports
+                from sglang.srt.managers.schedule_batch import Req
+                from sglang.srt.sampling.sampling_params import SamplingParams
+
+                # Build origin_input_ids from metadata.fill_ids
+                if metadata.fill_ids is not None:
+                    origin_input_ids = metadata.fill_ids
+                else:
+                    # Fallback: create dummy IDs based on token_count
+                    origin_input_ids = [0] * (metadata.token_count or 0)
+
+                new_req = Req(
+                    rid=new_rid,
+                    origin_input_text="",  # We don't have original text
+                    origin_input_ids=origin_input_ids,
+                    sampling_params=SamplingParams(),
+                )
+                new_req.mamba_pool_idx = new_pool_idx_scalar
+                new_req.fill_ids = torch.tensor(origin_input_ids, dtype=torch.int64, device='cuda') if origin_input_ids else torch.tensor([], dtype=torch.int64, device='cuda')
+
+                logger.info(
+                    f"Created new request from snapshot: conversation={recv_req.conversation_id}, "
+                    f"turn={recv_req.turn_number}, rid={new_rid}, mamba_pool_idx={new_pool_idx_scalar}"
+                )
+
+                return RestoreSnapshotReqOutput(
+                    success=True,
+                    message=f"Created new request from snapshot. rid={new_rid}, mamba_pool_idx={new_pool_idx_scalar}",
+                    token_count=metadata.token_count if metadata else None
+                )
+
+            except Exception as e:
+                logger.error(f"Failed to create new request from snapshot: {e}", exc_info=True)
+                return RestoreSnapshotReqOutput(
+                    success=False,
+                    message=f"Error creating new request from snapshot: {str(e)}"
+                )
 
         try:
             # Find the request by rid
@@ -1365,9 +1436,11 @@ class Scheduler(
                 mamba_pool, req.mamba_pool_idx, conv_states, temporal_states
             )
 
-            # Update request metadata
-            # Note: We cannot update fill_ids or input_text here because we don't store it
-            # This is a known limitation documented in the plan
+            # Sync fill_ids from metadata to request
+            if metadata.fill_ids is not None:
+                req.fill_ids = torch.tensor(metadata.fill_ids, dtype=torch.int64, device='cuda')
+                req.origin_input_ids = req.fill_ids  # sync origin too
+                logger.info(f"Synced fill_ids after restore, len={len(metadata.fill_ids)}")
 
             logger.info(
                 f"Snapshot restored: conversation={recv_req.conversation_id}, "
