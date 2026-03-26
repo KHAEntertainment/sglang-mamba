@@ -28,10 +28,12 @@ cd "$REPO_ROOT"
 source test/phases/config.sh   # sets MODEL_PATH, SERVER_PORT, SERVER_URL, RESULTS_DIR
 
 # Launch server WITH radix cache (do NOT pass --disable-radix-cache)
+# --enable-cache-report exposes cached_tokens in each response's usage object
 python -m sglang.launch_server \
     --model-path $MODEL_PATH \
     --port $SERVER_PORT \
     --mamba-scheduler-strategy no_buffer \
+    --enable-cache-report \
     > /tmp/phase4_server.log 2>&1 &
 
 export SERVER_PID=$!
@@ -95,18 +97,22 @@ curl -s http://localhost:$SERVER_PORT/v1/chat/completions \
   -d "{\"model\":\"default\",\"messages\":$(echo $LONG_PREFIX | python3 -c \"import sys,json; m=json.load(sys.stdin); m.append({'role':'user','content':'What is 2+2?'}); print(json.dumps(m))\"),\"temperature\":0,\"max_tokens\":10}" \
   2>&1 | tee /tmp/phase4_req_b.json
 
-# Check server log for MambaRadixCache activity
-grep -i "MambaRadixCache\|mamba_lock\|evict" /tmp/phase4_server.log | tail -10
-# Cache-hit evidence: check num_cached_tokens in response meta_info
+# Verify cache hit via cached_tokens counter in the response usage object.
+# Request B shares the long system prefix with A, so its cached_tokens must be > 0.
 python3 -c "
-import json
-for name, path in [('A', '/tmp/phase4_req_a.json'), ('B', '/tmp/phase4_req_b.json')]:
-    try:
-        data = json.load(open(path))
-        meta = data.get('meta_info', {})
-        print(f'Request {name}: cached_tokens={meta.get(\"num_cached_tokens\", \"N/A\")}, prompt_tokens={data.get(\"usage\", {}).get(\"prompt_tokens\", \"N/A\")}')
-    except Exception as e:
-        print(f'Request {name}: could not parse ({e})')
+import json, sys
+
+def cached_tokens(path):
+    data = json.load(open(path))
+    details = data.get('usage', {}).get('prompt_tokens_details', {})
+    return details.get('cached_tokens', 0)
+
+ct_a = cached_tokens('/tmp/phase4_req_a.json')
+ct_b = cached_tokens('/tmp/phase4_req_b.json')
+print(f'Request A cached_tokens: {ct_a}')
+print(f'Request B cached_tokens: {ct_b}')
+assert ct_b > 0, f'FAIL: Request B had no cached tokens (expected >0 for shared prefix). Got {ct_b}.'
+print('PASS: Cache hit confirmed — request B cached_tokens > 0.')
 "
 ```
 

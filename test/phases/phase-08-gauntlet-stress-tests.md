@@ -199,15 +199,11 @@ class TestMambaGauntletStress(unittest.TestCase):
         for o in outputs:
             self.assertGreater(len(o), 0, f"Empty output in repetition run: {outputs}")
 
-        # Compute unique outputs; at least 90% should agree (allowing minor nondeterminism)
-        from collections import Counter
-        counts = Counter(outputs)
-        most_common_count = counts.most_common(1)[0][1]
+        # At temperature=0, all 50 outputs must be identical — any divergence indicates
+        # state corruption or nondeterminism that constitutes a test failure.
         unique = set(outputs)
-        self.assertLessEqual(len(unique), 3,
-            f"Too many divergent outputs ({len(unique)}): {unique}")
-        self.assertGreaterEqual(most_common_count / len(outputs), 0.90,
-            f"Most common output appeared in only {most_common_count}/50 runs; outputs: {unique}")
+        self.assertEqual(len(unique), 1,
+            f"Outputs diverged across runs — expected all 50 identical at temperature=0: {unique}")
 
     def test_alternating_long_and_short_requests(self):
         """Interleave long-context and short requests 20 times; verify no cross-contamination."""
@@ -289,7 +285,7 @@ if __name__ == "__main__":
 - All 6 implemented stress tests pass
 - `test_high_concurrency_shared_prefix`: all 32 requests complete, non-empty, no errors
 - `test_rapid_distinct_requests_eviction_pressure`: 100 requests complete, zero errors
-- `test_repeated_same_request_cache_stability`: at most 3 unique outputs across 50 runs, with ≥90% agreement on the most common output
+- `test_repeated_same_request_cache_stability`: all 50 outputs identical (temperature=0 — any divergence is a failure)
 - `test_concurrent_multi_turn_conversations`: all 8 conversations maintain persona across 5 turns
 - `test_server_health_after_stress`: server still returns 200 after full gauntlet
 - No `CUDA error`, `mamba_lock_ref` assertion, or `sanity_check` failure in server logs during or after run
