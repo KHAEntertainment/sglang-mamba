@@ -42,20 +42,24 @@ The model config bug (`architectures: None` crash) was fixed. All phase plans an
 ### SSH to gcloud
 ```bash
 gcloud compute ssh --zone "asia-east1-c" "sglang-test-v100-20260325-230245" --project "gen-lang-client-0471830999"
-cd /home/bbrenner/sglang-mamba
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
 ```
 
 ### Using Granite (default)
 ```bash
-cd /home/bbrenner/sglang-mamba
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
 source test/phases/config.sh
 ```
 
 ### Using Nemotron (if granite OOMs)
 ```bash
-cd /home/bbrenner/sglang-mamba
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
 source test/phases/config.sh
-export MODEL_PATH=$NEMOTRON_MODEL_PATH MODEL_NAME=$NEMOTRON_MODEL_NAME
+export MODEL_PATH=$NEMOTRON_MODEL_PATH
+export MODEL_NAME=$NEMOTRON_MODEL_NAME
 ```
 
 ### Run Phase 01

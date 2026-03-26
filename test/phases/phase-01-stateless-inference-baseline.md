@@ -20,7 +20,8 @@ Verify the SGLang-Mamba server boots and serves correct outputs **without activa
 ## Environment Setup
 
 ```bash
-cd /home/bbrenner/sglang-mamba
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
 
 # Set model path
 source test/phases/config.sh   # sets MODEL_PATH, SERVER_PORT, SERVER_URL, RESULTS_DIR
@@ -37,10 +38,11 @@ export SERVER_PID=$!
 
 # Wait for server ready
 python -c "
-import time, requests
+import time, requests, os
+port = os.environ.get('SERVER_PORT', '30000')
 for i in range(60):
     try:
-        r = requests.get('http://localhost:30000/health')
+        r = requests.get(f'http://localhost:{port}/health')
         if r.status_code == 200:
             print('Server ready')
             break
