@@ -296,17 +296,21 @@ class TestMambaRadixCacheComprehensive(unittest.TestCase):
                     mamba_value=mamba_value,
                 )
             )
+            # Cache now owns the mamba state; free the req pool slot for reuse
+            self.req_to_token_pool.free(req)
 
         # Verify cache is full
         self.assertEqual(self.req_to_token_pool.mamba_pool.available_size(), 0)
 
-        # Try to insert one more - should trigger eviction
+        # insert() does not auto-evict; explicitly free 1 LRU slot before allocating req_new.
+        evict_result = self.cache.evict(EvictParams(num_tokens=0, mamba_num=1))
+        self.assertGreaterEqual(evict_result.mamba_num_evicted, 1)
+
         req_new = self._make_dummy_req()
         token_ids_new = [self.mamba_cache_size]  # New unique token
         kv_indices_new = self.allocator.alloc(1)
         mamba_value_new = req_new.mamba_pool_idx.unsqueeze(0)
 
-        # Insert new item (should trigger eviction of LRU item)
         self.cache.insert(
             InsertParams(
                 key=RadixKey(token_ids_new),
@@ -315,22 +319,25 @@ class TestMambaRadixCacheComprehensive(unittest.TestCase):
             )
         )
 
-        # Verify eviction occurred: cache size should still be at limit
+        # Cache should be back at capacity
         self.assertEqual(
             self.req_to_token_pool.mamba_pool.available_size(),
             0,
-            "Cache should remain at capacity after eviction"
+            "Cache should remain at capacity after eviction",
         )
 
-        # Verify new item is present in cache
+        # New item must be findable
         match_result = self.cache.match_prefix(MatchPrefixParams(key=RadixKey(token_ids_new)))
-        self.assertIsNotNone(match_result.value, "New item should be findable in cache")
+        self.assertGreater(
+            len(match_result.device_indices), 0, "New item should be findable in cache"
+        )
 
-        # Verify at least one original item was evicted (first item should be LRU)
+        # First item (LRU) must have been evicted
         first_item_match = self.cache.match_prefix(MatchPrefixParams(key=RadixKey([0])))
-        self.assertIsNone(
-            first_item_match.value,
-            "Oldest (LRU) item should have been evicted"
+        self.assertEqual(
+            len(first_item_match.device_indices),
+            0,
+            "Oldest (LRU) item should have been evicted",
         )
 
     def test_cow_mamba_state(self):
@@ -480,49 +487,67 @@ class TestMambaRadixCacheComprehensive(unittest.TestCase):
         self.assertEqual(self.cache.mamba_evictable_size(), 1)
 
     def test_mamba_branching_seqlen(self):
-        """Test mamba_branching_seqlen calculation for branching points."""
-        # Insert a base sequence [1, 2, 3, 4]
-        req1 = self._make_dummy_req()
-        token_ids_1 = [1, 2, 3, 4]
-        kv_indices_1 = self.allocator.alloc(4)
-        mamba_value_1 = req1.mamba_pool_idx.unsqueeze(0)
-        self.cache.insert(
-            InsertParams(
-                key=RadixKey(token_ids_1),
-                value=kv_indices_1,
-                mamba_value=mamba_value_1,
-            )
-        )
+        """Test mamba_branching_seqlen is set when the matched path crosses tombstones.
 
-        # Evict the Mamba state to create a tombstone
-        evict_result = self.cache.evict(EvictParams(num_tokens=0, mamba_num=1))
-        self.assertEqual(evict_result.mamba_num_evicted, 1)
+        Strategy: insert A(65), B(75), C(85) tokens — each extends the previous.
+        Tree: root → NodeA([0..64]) → NodeB([65..74]) → NodeC([75..84])
 
-        # Insert a longer sequence [1, 2, 3, 4, 5, 6, 7, 8]
-        req2 = self._make_dummy_req()
-        token_ids_2 = [1, 2, 3, 4, 5, 6, 7, 8]
-        kv_indices_2 = self.allocator.alloc(8)
-        mamba_value_2 = req2.mamba_pool_idx.unsqueeze(0)
-        self.cache.insert(
-            InsertParams(
-                key=RadixKey(token_ids_2),
-                value=kv_indices_2,
-                mamba_value=mamba_value_2,
-            )
-        )
+        After all inserts _insert_helper touches nodes root→leaf in order, so
+        the mamba LRU order is: NodeA (LRU) < NodeB < NodeC (MRU).
 
-        # Match the longer sequence - should calculate mamba_branching_seqlen
-        match_result = self.cache.match_prefix(MatchPrefixParams(key=RadixKey(token_ids_2)))
-        # mamba_branching_seqlen should be set because there's a tombstone in the path
-        # The exact value depends on mamba_cache_chunk_size
+        Evicting 2 mamba states tombstones NodeA then NodeB (both are internal
+        nodes with children, so they become tombstones instead of being deleted).
+
+        Matching B=[0..74] traverses both tombstones; matched tokens=75,
+        chunk-aligned = (75//64)*64 = 64 → mamba_branching_seqlen == 64.
+
+        KV note: fake zero tensors are used to stay within the test's 128-slot
+        KV pool.  Internal-node eviction never calls token_to_kv_pool_allocator
+        .free(), so fake tensors are safe here.
+        """
+        token_ids_A = list(range(65))   # [0..64]  — 65 tokens
+        token_ids_B = list(range(75))   # [0..74]  — 75 tokens (= A + 10)
+        token_ids_C = list(range(85))   # [0..84]  — 85 tokens (= B + 10)
+
+        # Fake KV tensors — value does not matter for branching_seqlen correctness.
+        kv_A = torch.zeros(65, dtype=torch.int64)
+        kv_B = torch.zeros(75, dtype=torch.int64)
+        kv_C = torch.zeros(85, dtype=torch.int64)
+
+        req_a = self._make_dummy_req()
+        self.cache.insert(InsertParams(
+            key=RadixKey(token_ids_A), value=kv_A,
+            mamba_value=req_a.mamba_pool_idx.unsqueeze(0),
+        ))
+
+        req_b = self._make_dummy_req()
+        self.cache.insert(InsertParams(
+            key=RadixKey(token_ids_B), value=kv_B,
+            mamba_value=req_b.mamba_pool_idx.unsqueeze(0),
+        ))
+
+        req_c = self._make_dummy_req()
+        self.cache.insert(InsertParams(
+            key=RadixKey(token_ids_C), value=kv_C,
+            mamba_value=req_c.mamba_pool_idx.unsqueeze(0),
+        ))
+
+        # Evict 2 mamba states: LRU=NodeA → tombstone, then NodeB → tombstone.
+        evict_result = self.cache.evict(EvictParams(num_tokens=0, mamba_num=2))
+        self.assertGreaterEqual(evict_result.mamba_num_evicted, 2)
+
+        # Match B: path goes through NodeA(tombstone) + NodeB(tombstone).
+        # best_value_len=0 (no live mamba node on path) → branching detected.
+        # sum(matched)=75 → chunk_aligned=64 → mamba_branching_seqlen=64.
+        match_result = self.cache.match_prefix(MatchPrefixParams(key=RadixKey(token_ids_B)))
         self.assertIsNotNone(
             match_result.mamba_branching_seqlen,
-            "mamba_branching_seqlen should be set when tombstone is encountered"
+            "mamba_branching_seqlen should be set when tombstone is encountered",
         )
-        self.assertGreater(
+        self.assertEqual(
             match_result.mamba_branching_seqlen,
-            0,
-            "mamba_branching_seqlen should be > 0 when branching occurs"
+            64,
+            "mamba_branching_seqlen should equal chunk-aligned total matched tokens",
         )
 
 if __name__ == "__main__":
