@@ -3512,10 +3512,16 @@ class Scheduler(
         if mamba_pool is None:
             return
 
-        # Trigger hooks for each request
+        # Trigger hooks for each request (prefill and non-decode paths).
+        # Finished decode requests are handled earlier in process_batch_result_decode,
+        # before free_mamba_cache clears mamba_pool_idx. Skip them here.
         for req in batch.reqs:
-            # Skip if request doesn't have mamba_pool_idx
+            # Skip if request doesn't have mamba_pool_idx (already freed or N/A)
             if not hasattr(req, "mamba_pool_idx") or req.mamba_pool_idx is None:
+                continue
+
+            # Finished decode reqs already snapshotted via the pre-free hook
+            if req.finished():
                 continue
 
             # Calculate turn number (approximate based on output length)

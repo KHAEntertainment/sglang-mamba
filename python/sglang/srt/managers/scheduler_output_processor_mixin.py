@@ -470,6 +470,31 @@ class SchedulerOutputProcessorMixin:
             if req.finished():
                 self.maybe_collect_routed_experts(req)
 
+                # Snapshot Mamba state BEFORE freeing the pool slot.
+                # _trigger_snapshot_hooks (called later) fires after free_mamba_cache
+                # has already set mamba_pool_idx = None, so it misses finished reqs.
+                # We snapshot here while the state is still live in the pool.
+                if (
+                    getattr(self, "snapshot_hook_manager", None) is not None
+                    and hasattr(req, "mamba_pool_idx")
+                    and req.mamba_pool_idx is not None
+                ):
+                    _mamba_pool = getattr(self.req_to_token_pool, "mamba_pool", None)
+                    if _mamba_pool is not None:
+                        _fill_ids = getattr(req, "fill_ids", None)
+                        _turn_number = (
+                            len(_fill_ids)
+                            if _fill_ids is not None and hasattr(_fill_ids, "__len__")
+                            else len(req.output_ids)
+                        )
+                        self.snapshot_hook_manager.trigger_post_forward(
+                            req=req,
+                            mamba_pool=_mamba_pool,
+                            req_pool=self.req_to_token_pool,
+                            turn_number=_turn_number,
+                            additional_context=None,
+                        )
+
                 if self.server_args.disaggregation_decode_enable_offload_kvcache:
                     # Asynchronously offload KV cache; release_kv_cache will be called after Device->Host transfer completes
                     if not self.decode_offload_manager.offload_kv_cache(req):
