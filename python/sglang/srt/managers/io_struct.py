@@ -2083,13 +2083,39 @@ class RestoreSnapshotReqInput(BaseReq):
     # returns output_ids + output_text in RestoreSnapshotReqOutput.
     continuation_ids: Optional[List[int]] = None
     max_new_tokens: Optional[int] = None
+    # Correlation ID for per-request futures (prevents FIFO out-of-order responses)
+    request_id: Optional[str] = field(default=None, kw_only=True)
 
     def __post_init__(self):
+        # Auto-generate request_id if not provided (for per-request futures)
+        if self.request_id is None:
+            self.request_id = uuid.uuid4().hex
+
         if not (self.rid or self.conversation_id):
             raise ValueError(
                 "RestoreSnapshotReqInput requires at least one of 'rid' or "
                 "'conversation_id' to be set."
             )
+
+        # Validate stateful generation fields
+        if not self.create_new_request:
+            # Stateful fields should only be provided when create_new_request=True
+            if self.continuation_ids is not None or self.max_new_tokens is not None:
+                raise ValueError(
+                    "continuation_ids and max_new_tokens can only be provided when "
+                    "create_new_request=True. These fields are for stateful generation "
+                    "where the server restores context and generates a response."
+                )
+        else:
+            # When create_new_request=True, at least max_new_tokens should be provided
+            if self.max_new_tokens is None:
+                raise ValueError(
+                    "max_new_tokens must be provided when create_new_request=True."
+                )
+            if self.continuation_ids is None:
+                raise ValueError(
+                    "continuation_ids must be provided when create_new_request=True."
+                )
 
 
 @dataclass
@@ -2107,6 +2133,8 @@ class RestoreSnapshotReqOutput(BaseReq):
     mamba_pool_idx: Optional[int] = None
     output_ids: Optional[List[int]] = None
     output_text: Optional[str] = None
+    # Correlation ID to match request/response for per-request futures
+    request_id: Optional[str] = field(default=None, kw_only=True)
 
 
 @dataclass

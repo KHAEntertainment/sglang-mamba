@@ -1333,10 +1333,14 @@ class Scheduler(
         """
         from sglang.srt.managers.io_struct import RestoreSnapshotReqOutput
 
+        # Extract request_id for correlation
+        request_id = recv_req.request_id
+
         if self.snapshot_manager is None:
             return RestoreSnapshotReqOutput(
                 success=False,
-                message="Snapshot system not enabled. Start server with --enable-mamba-snapshots"
+                message="Snapshot system not enabled. Start server with --enable-mamba-snapshots",
+                request_id=request_id,
             )
 
         # Derive effective_conv_id once for both paths
@@ -1350,7 +1354,8 @@ class Scheduler(
                 if mamba_pool is None:
                     return RestoreSnapshotReqOutput(
                         success=False,
-                        message="Mamba pool not available"
+                        message="Mamba pool not available",
+                        request_id=request_id,
                     )
 
                 # Resolve turn_number: if not provided, use latest
@@ -1361,6 +1366,7 @@ class Scheduler(
                         return RestoreSnapshotReqOutput(
                             success=False,
                             message=f"No snapshots found for conversation={effective_conv_id}",
+                            request_id=request_id,
                         )
                     turn_number, _ = latest
 
@@ -1381,6 +1387,7 @@ class Scheduler(
                             f"Snapshot not found: conversation={effective_conv_id}, "
                             f"turn={turn_number}, branch={recv_req.branch_name}"
                         ),
+                        request_id=request_id,
                     )
 
                 conv_states, temporal_states, metadata = snapshot
@@ -1390,7 +1397,8 @@ class Scheduler(
                 if new_pool_idx is None:
                     return RestoreSnapshotReqOutput(
                         success=False,
-                        message="No free Mamba pool slots available"
+                        message="No free Mamba pool slots available",
+                        request_id=request_id,
                     )
 
                 # new_pool_idx is a (1,)-tensor; get a 0-dim tensor and a scalar
@@ -1422,6 +1430,7 @@ class Scheduler(
                             "Snapshot is incompatible: fill_ids missing. "
                             "Re-run the original conversation to create a compatible snapshot."
                         ),
+                        request_id=request_id,
                     )
                 origin_input_ids = list(metadata.fill_ids)
 
@@ -1431,6 +1440,24 @@ class Scheduler(
                 stateful_generate = bool(recv_req.continuation_ids)
                 if stateful_generate:
                     origin_input_ids = origin_input_ids + list(recv_req.continuation_ids)
+
+                # Check total input length against max_req_input_len
+                total_input_len = len(origin_input_ids)
+                max_req_input_len = self.server_args.max_req_input_len if hasattr(self.server_args, 'max_req_input_len') else None
+                if max_req_input_len is not None and total_input_len > max_req_input_len:
+                    # Input too long — fail fast to avoid Mamba state desynchronization
+                    mamba_pool.free(new_pool_idx_scalar)
+                    return RestoreSnapshotReqOutput(
+                        success=False,
+                        message=(
+                            f"Input length ({total_input_len}) exceeds max_req_input_len ({max_req_input_len}). "
+                            "Cannot restore snapshot with continuation_ids that would exceed the limit. "
+                            "Reduce continuation_ids length or increase max_req_input_len."
+                        ),
+                        rid=new_rid,
+                        mamba_pool_idx=None,
+                        request_id=request_id,
+                    )
 
                 _sp = SamplingParams()
                 _sp.normalize(None)  # initialize stop_strs etc. (no tokenizer needed)
@@ -1442,6 +1469,7 @@ class Scheduler(
                     origin_input_ids=origin_input_ids,
                     sampling_params=_sp,
                     vocab_size=self.model_config.vocab_size,
+                    http_worker_ipc=recv_req.http_worker_ipc,  # Pass through for output routing
                 )
                 new_req.conversation_id = effective_conv_id
                 new_req.mamba_pool_idx = new_pool_idx_0d  # 0-dim tensor, required by free_mamba_cache
@@ -1486,6 +1514,7 @@ class Scheduler(
                             message=f"Request not admitted to queue (queue full or priority validation failed). rid={new_rid}",
                             rid=new_rid,
                             mamba_pool_idx=None,
+                            request_id=request_id,
                         )
 
                     logger.info(
@@ -1505,6 +1534,7 @@ class Scheduler(
                         token_count=metadata.token_count if metadata else None,
                         rid=new_rid,
                         mamba_pool_idx=new_pool_idx_scalar,
+                        request_id=request_id,
                     )
                 except Exception as reg_error:
                     # If registration fails, clean up the allocated mamba pool slot
@@ -1526,7 +1556,8 @@ class Scheduler(
                         logger.error(f"Failed to free mamba pool slot during error cleanup: {cleanup_error}")
                 return RestoreSnapshotReqOutput(
                     success=False,
-                    message=f"Error creating new request from snapshot: {str(e)}"
+                    message=f"Error creating new request from snapshot: {str(e)}",
+                    request_id=request_id,
                 )
 
         try:
@@ -1545,24 +1576,28 @@ class Scheduler(
                         success=True,
                         message=f"Snapshot state available for future requests (rid={recv_req.rid})",
                         token_count=None,
+                        request_id=request_id,
                     )
                 return RestoreSnapshotReqOutput(
                     success=False,
-                    message=f"Request not found: {recv_req.rid}"
+                    message=f"Request not found: {recv_req.rid}",
+                    request_id=request_id,
                 )
 
             # Check that request is idle (not currently running)
             if self.running_batch and req in self.running_batch.reqs:
                 return RestoreSnapshotReqOutput(
                     success=False,
-                    message="Cannot restore snapshot while request is running. Wait until request is idle."
+                    message="Cannot restore snapshot while request is running. Wait until request is idle.",
+                    request_id=request_id,
                 )
 
             # Check if request has mamba pool index
             if not hasattr(req, 'mamba_pool_idx') or req.mamba_pool_idx is None:
                 return RestoreSnapshotReqOutput(
                     success=False,
-                    message="Request does not have Mamba state allocated"
+                    message="Request does not have Mamba state allocated",
+                    request_id=request_id,
                 )
 
             # Load snapshot (use rid as conversation_id fallback)
