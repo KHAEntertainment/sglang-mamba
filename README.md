@@ -6,7 +6,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/sglang)](https://pypi.org/project/sglang)
 ![PyPI - Downloads](https://static.pepy.tech/badge/sglang?period=month)
-[![license](https://img.shields.io/github/license/sgl-project/sglang.svg)](https://github.com/sgl-project/sglang/tree/main/LICENSE)
+[![license](https://img.shields.io/github/license/sgl-project/sglang.svg)](https://github.com/sgl-project/sglang/tree/main/LICENSE) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/KHAEntertainment/sglang-mamba)
 
 [**Documentation**](docs/stateful_mamba/README.md) | [**Quick Start**](#quick-start) | [**Why Stateful?**](#why-stateful-over-stateless) | [**Agent Framework**](docs/agent_framework/README.md)
 
