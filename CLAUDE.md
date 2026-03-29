@@ -8,6 +8,21 @@ This is **SGLang with stateful Mamba inference** — a fork of [upstream SGLang]
 
 **Upstream**: https://github.com/sgl-project/sglang
 
+## Project Tracking
+
+**This project is managed in Linear.** All work, issues, and milestones are tracked at:
+
+> **Workspace:** https://linear.app/khaentertainment
+> **Project:** [SGLang - Mamba](https://linear.app/khaentertainment/project/sglang-mamba-e14f2152be8d)
+
+**Use Linear for:**
+- Checking current work status and priorities
+- Creating new issues before starting work
+- Updating issue status as work progresses
+- Tracking milestones and DoD checkpoints
+
+**Do NOT use markdown files for tracking TODOs or project state.** The `phase3/` directory contains historical implementation notes — reference them for context, but Linear is the source of truth for active work.
+
 ## Common Commands
 
 ### Installation
@@ -75,7 +90,10 @@ python/sglang/
 │   ├── snapshot/           # Mamba snapshot implementation
 │   │   ├── mamba_snapshot.py       # Core snapshot save/restore logic
 │   │   ├── mamba_host_pool.py      # Host memory pool management
-│   │   └── snapshot_policy.py      # Snapshot eviction policies
+│   │   ├── tier_manager.py        # 3-tier VRAM/RAM/Disk orchestration + startup restore
+│   │   ├── conversation_tracker.py # Tier state tracking
+│   │   ├── snapshot_hooks.py      # Hook manager (post_forward, pre_eviction, on_demand)
+│   │   └── snapshot_policy.py     # Snapshot eviction policies
 │   ├── agents/             # Agent framework
 │   │   ├── agent_loop.py          # Agent execution loop
 │   │   ├── tool_registry.py       # Tool registration
@@ -95,7 +113,17 @@ test/
 │   ├── snapshot/          # Snapshot save/restore tests
 │   └── agents/           # Agent framework tests
 ├── srt/                   # SRT runtime tests
-└── registered/            # CI registry tests
+├── registered/            # CI registry tests
+│   └── radix_cache/       # MambaRadixCache comprehensive + gauntlet tests
+├── phases/                # 9-phase GPU test plan (phases 0-8)
+│   ├── config.sh          # Single source of truth for paths/ports
+│   ├── codemap.md         # Code navigation reference
+│   └── results/           # Phase execution reports
+└── manual/                # Manual integration tests
+
+.beads/                     # Beads issue tracking (initialized)
+skills/mamba-sglang/        # Gemini CLI skill + reference docs
+docs/migration-prep/        # VM migration context (gitignored)
 ```
 
 ### Core Components
@@ -103,6 +131,8 @@ test/
 **Snapshot System** (`python/sglang/srt/snapshot/`):
 - `MambaSnapshotManager` — Low-level serialization to safetensors + JSON
 - `MambaHostPool` — Host memory pool for snapshot staging between GPU and disk
+- `TierManager` — 3-tier memory management (VRAM/RAM/Disk) with automatic transitions
+- `restore_latest_snapshots_to_warm_tier()` — Startup restore into WARM tier (Gap 3 — DONE)
 - `snapshot_policy.py` — LRU eviction policies for tier management
 
 **Agent Framework** (`python/sglang/srt/agents/`):
@@ -134,20 +164,35 @@ test/
 - Tests use `pytest` with `asyncio_mode = auto` (see `test/pytest.ini`)
 - SRT tests use `unittest` framework directly
 - Integration tests in `test/registered/` use the CI registry system
+- **GPU test phases** in `test/phases/` (phases 0-8): phases 0/2/3/5 PASS on V100, phases 1/4/6/7/8 blocked by sm75+ GPU requirement
+- `test/phases/config.sh` is the single source of truth for model paths and server ports
 
 ## Development Phases
 
-Phase plans and validation reports are in `phase3/` directory:
-- `PHASE_3_PLAN.md` - Full development plan with 4 phases
-- `MAMBA_SNAPSHOT_RESTORATION_PLAN.md` - Original snapshot restoration plan
-- `phase3/oversight/validation_reports/` - Phase validation reports
-- `phase3/PERFORMANCE_ANALYSIS.md` - Static analysis with optimization opportunities
+> Historical implementation context lives in `phase3/` — see for architecture details and validation reports. Active work tracking is in Linear (see above).
 
-### Phase Status
+### Phase Status (Linear)
 - Phase 3.1 ✅ Complete - Foundation
-- Phase 3.2 ✅ Complete - Core Implementation (MambaRadixCache was already implemented!)
-- Phase 3.3 ✅ Complete - Static Analysis (optimizations identified)
-- Phase 3.4 ⬜ Pending - Final Audit
+- Phase 3.2 ✅ Complete - Core Implementation
+- Phase 3.3 ✅ Complete - Static Analysis (KHA-7 through KHA-11: performance optimizations identified)
+- Phase 3.4 ⬜ Pending - [KHA-6: Final Audit], [KHA-14: cleanup phase3 docs]
+- **All 3 snapshot gaps CLOSED**: Gap 1 (fill_ids sync) ✅, Gap 2 (create_new_request) ✅, Gap 3 (startup warm restore) ✅
+
+### Active Issues (Linear)
+| ID | Priority | Title | Status |
+|----|----------|-------|--------|
+| ~~KHA-5~~ | ~~High~~ | ~~Implement restore_snapshots_on_startup (Gap 3)~~ | **CLOSED** |
+| [KHA-6](https://linear.app/khaentertainment/issue/KHA-6) | Medium | Phase 3.4 — Final Audit | Backlog |
+| [KHA-7](https://linear.app/khaentertainment/issue/KHA-7) | Urgent | [PERF] Remove setattr/getattr overhead in LRUList | Backlog |
+| [KHA-8](https://linear.app/khaentertainment/issue/KHA-8) | High | [PERF] Optimize tensor cloning | Backlog |
+| [KHA-9](https://linear.app/khaentertainment/issue/KHA-9) | Medium | [PERF] Cache tree depth for lock optimization | Backlog |
+| [KHA-10](https://linear.app/khaentertainment/issue/KHA-10) | High | [PERF] Optimize LRU traversal | Backlog |
+| [KHA-11](https://linear.app/khaentertainment/issue/KHA-11) | Medium | [PERF] Batch lock operations | Backlog |
+| [KHA-12](https://linear.app/khaentertainment/issue/KHA-12) | High | Document sglang.srt.models.mamba | Backlog |
+| [KHA-13](https://linear.app/khaentertainment/issue/KHA-13) | High | Document sglang.srt.layers.mamba | Backlog |
+| [KHA-14](https://linear.app/khaentertainment/issue/KHA-14) | Low | Clean up phase3 docs after Phase 3.4 completes | Backlog |
+
+> **Note:** Performance issues (KHA-7 through KHA-11) are blocked by server-phase testing. Do not start until Phases 1, 4, and 7 pass on sm75+ hardware.
 
 ## GCloud Testing Instance
 
@@ -182,9 +227,44 @@ Cloudflare tunnel: `<TUNNEL_HOST>` → `localhost:30000`
 1. **Mamba model config bug**: `architectures: None` causes crash in model_config.py line 149 *(fixed)*
 2. **Granite GGUF**: `granitehybrid` architecture not supported by transformers GGUF loader
 3. **V100 memory**: Full Granite MoE models require >16GB GPU memory — use Nemotron fallback
+4. **sm75+ GPU blocker**: FLA Mamba2 CUDA kernels + FlashInfer require sm75+. Server test phases (1/4/6/7/8) cannot run on V100 (sm70). Need A100, T4, A10G, or RTX 30xx+
+5. **Current branch behind main**: `fix/snapshot-restore-state-sync` is 8 commits behind `main` (missing PR #6 startup restore). Merge `main` in before continuing work.
+
+## Context & Project Management Access
+
+**Do not use the Linear CLI or native Linear MCP directly.**
+
+All Linear interaction goes through **core-memory MCP** via `execute_integration_action`. This builds accumulated project memory over time.
+
+**Session start pattern:**
+```
+# 1. Search memory for prior context
+memory_search("sglang-mamba")
+
+# 2. Check Linear backlog via core-memory
+execute_integration_action(
+  accountId: "0b4764e3-a793-4537-89b7-b26eff7b7675",
+  action: "linear_search_issues",
+  params: { query: "sglang-mamba", first: 20 }
+)
+```
+
+**Available Linear actions through core-memory:**
+- `linear_search_issues` — search/filter by project, label, state, text
+- `linear_create_issue` — create with projectId, priority, labels, parent
+- `linear_update_issue` — update state, project, labels (requires internal UUID, not KHA-XX)
+- `linear_create_project` / `linear_update_project` — manage projects
+- `linear_create_label` — create team labels
+
+**Linear accountId:** `0b4764e3-a793-4537-89b7-b26eff7b7675`
+**Linear projectId:** `f7f1cb8c-c4cd-4b63-83f6-58b9ddba6ce8`
+**Linear teamId:** `1ee12f51-86fc-4bce-8cad-845d8a67bfa9`
 
 ## Memory Context
 
 For session persistence, important project context is stored in:
 - Global memory: `~/.claude/projects/<PROJECT_PATH>/memory/`
-- Session ID for this project: `sglang-mamba-session-001`
+- Core-memory MCP: accumulated context across all agent sessions
+- VM migration context: `docs/migration-prep/` (gitignored, not for commit)
+
+**Linear is the source of truth for project management** — see the Project Tracking section above.
