@@ -32,7 +32,7 @@ not because Mamba state was being used.
 
 ### Implementation Required
 
-Two issues required new code (~80 lines, 4 files):
+Two issues required new code (~80 lines, 5 files):
 
 1. **No output channel for `create_new_request=True`**: The HTTP connection gets
    the new rid but generated output is orphaned. Fix: add `continuation_ids` +
@@ -107,7 +107,7 @@ python -m sglang.launch_server \
 | File | Change |
 |------|--------|
 | `python/sglang/srt/managers/io_struct.py` | Add continuation_ids, max_new_tokens, output_ids, output_text |
-| `python/sglang/srt/managers/scheduler.py` | Append continuation_ids, set _stateful_generate, defer output |
+| `python/sglang/srt/managers/scheduler.py` | Append continuation_ids, set `_stateful_generate`, defer output |
 | `python/sglang/srt/managers/scheduler_output_processor_mixin.py` | Route stateful output through snapshot channel |
 | `python/sglang/srt/managers/tokenizer_manager.py` | Detokenize output_ids |
 | `python/sglang/srt/entrypoints/http_server.py` | Expose output_ids, output_text in response |

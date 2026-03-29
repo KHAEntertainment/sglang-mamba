@@ -1391,7 +1391,9 @@ class TokenizerManager(TokenizerCommunicatorMixin, TokenizerManagerMultiItemMixi
         await self.send_to_scheduler.send_pyobj(obj)
         recv_obj = await self.snapshot_restore_result_queue.get()
         # Detokenize generated output for stateful-generate requests.
-        if recv_obj.output_ids and self.tokenizer is not None:
+        # Use "is not None" instead of truthiness to handle empty lists correctly
+        # (an empty list should decode to "", not skip decoding).
+        if recv_obj.output_ids is not None and self.tokenizer is not None:
             recv_obj.output_text = self.tokenizer.decode(
                 recv_obj.output_ids, skip_special_tokens=True
             )

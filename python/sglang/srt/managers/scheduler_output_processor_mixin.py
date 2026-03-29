@@ -981,11 +981,28 @@ class SchedulerOutputProcessorMixin:
                 if req.finished() and not getattr(req, "finished_output", False):
                     req.finished_output = True
                     from sglang.srt.managers.io_struct import RestoreSnapshotReqOutput
+
+                    # Derive success from the actual finish reason, not always True.
+                    # A request that finished due to error/abort should report success=False.
+                    finish_reason = getattr(req, "finished_reason", None)
+                    success = True
+                    if finish_reason is not None:
+                        # Check if finish_reason indicates failure (abort, error, etc.)
+                        # BaseFinishReason has a 'type' field: 'abort', 'length', 'matched_token', 'matched_str', 'matched_regex'
+                        from sglang.srt.managers.schedule_batch import BaseFinishReason
+                        if isinstance(finish_reason, BaseFinishReason):
+                            if hasattr(finish_reason, "type") and finish_reason.type == "abort":
+                                success = False
+
+                    # Use output_ids_through_stop to match the normal /generate path behavior
+                    # (stop tokens are trimmed from the output).
+                    output_ids = list(req.output_ids_through_stop)
+
                     self.send_to_tokenizer.send_output(
                         RestoreSnapshotReqOutput(
-                            success=True,
+                            success=success,
                             rid=req.rid,
-                            output_ids=list(req.output_ids),
+                            output_ids=output_ids,
                         )
                     )
                 continue

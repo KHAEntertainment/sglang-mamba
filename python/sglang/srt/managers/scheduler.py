@@ -1453,7 +1453,41 @@ class Scheduler(
                 # Register the new request in the waiting queue so it can be found by _find_request_by_rid
                 try:
                     self.init_req_max_new_tokens(new_req)
+
+                    # Check queue admission: _add_request_to_queue can silently refuse the request
+                    # (e.g., priority validation failure, queue full). In those cases, it sends an
+                    # AbortReq to the tokenizer but doesn't raise. Detect admission by checking if
+                    # the request's queue entry timestamp was set.
                     self._add_request_to_queue(new_req)
+
+                    # Detect if the request was actually admitted to the queue.
+                    # For NULL mode, check if wait_queue_entry_time was set (only set when added).
+                    # For PREFILL mode, check prefill_bootstrap_queue_entry_time.
+                    # For DECODE mode, check decode_prealloc_queue_entry_time.
+                    request_admitted = False
+                    if self.disaggregation_mode == DisaggregationMode.NULL:
+                        request_admitted = new_req.time_stats.wait_queue_entry_time is not None
+                    elif self.disaggregation_mode == DisaggregationMode.PREFILL:
+                        request_admitted = new_req.time_stats.prefill_bootstrap_queue_entry_time is not None
+                    elif self.disaggregation_mode == DisaggregationMode.DECODE:
+                        request_admitted = new_req.time_stats.decode_prealloc_queue_entry_time is not None
+
+                    if not request_admitted:
+                        # Request was not admitted (e.g., queue full, priority validation failed).
+                        # _add_request_to_queue already sent an AbortReq to the tokenizer.
+                        # Clean up the allocated mamba pool slot and return failure.
+                        logger.warning(
+                            f"Restore snapshot request not admitted to queue: conversation={recv_req.conversation_id}, "
+                            f"rid={new_rid}, stateful_generate={stateful_generate}"
+                        )
+                        mamba_pool.free(new_pool_idx)
+                        return RestoreSnapshotReqOutput(
+                            success=False,
+                            message=f"Request not admitted to queue (queue full or priority validation failed). rid={new_rid}",
+                            rid=new_rid,
+                            mamba_pool_idx=None,
+                        )
+
                     logger.info(
                         f"Created new request from snapshot: conversation={recv_req.conversation_id}, "
                         f"turn={recv_req.turn_number}, rid={new_rid}, mamba_pool_idx={new_pool_idx_scalar}, "

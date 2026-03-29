@@ -23,7 +23,6 @@ Returns:
 }
 """
 
-import json
 import os
 import time
 import unittest
@@ -73,14 +72,37 @@ class TestMambaStatefulInference(unittest.TestCase):
         r.raise_for_status()
         return r.json()
 
-    def _save_snapshot(self, rid):
-        r = requests.post(
-            f"{SERVER_URL}/save_snapshot",
-            json={"rid": rid},
-            timeout=30,
-        )
-        r.raise_for_status()
-        return r.json()
+    def _save_snapshot(self, rid, timeout_seconds=2.0):
+        """Save snapshot with polling to ensure auto-snapshot has completed.
+
+        The auto-snapshot (triggered by post-forward hook) happens asynchronously
+        after request completion. This method polls until the snapshot is confirmed
+        saved or the timeout elapses.
+        """
+        start_time = time.time()
+        poll_interval = 0.05  # 50ms between polls
+
+        while True:
+            r = requests.post(
+                f"{SERVER_URL}/save_snapshot",
+                json={"rid": rid},
+                timeout=30,
+            )
+            r.raise_for_status()
+            result = r.json()
+
+            # Check if snapshot was successfully saved
+            if result.get("success") and result.get("snapshot_id") is not None:
+                return result
+
+            # Check timeout
+            elapsed = time.time() - start_time
+            if elapsed >= timeout_seconds:
+                # Return the last result even if not ideal - let the test fail naturally
+                return result
+
+            # Wait before next poll
+            time.sleep(poll_interval)
 
     def _tokenize(self, text):
         tok = _get_tokenizer()
@@ -91,8 +113,20 @@ class TestMambaStatefulInference(unittest.TestCase):
 
         The client sends ONLY the new tokens — no prior conversation history.
         The server reconstructs context from the saved Mamba SSM snapshot.
+
+        NOTE: continuation_ids are created using apply_chat_template to match
+        the token format used during snapshot creation (fill_ids). This ensures
+        that the restored state processes the continuation tokens correctly.
         """
-        continuation_ids = self._tokenize(new_text)
+        tok = _get_tokenizer()
+        # Use apply_chat_template to tokenize the new message consistently
+        # with how fill_ids were created during the original conversation.
+        # This bypasses the full chat template and only tokenizes the new content.
+        continuation_ids = tok.apply_chat_template(
+            [{"role": "user", "content": new_text}],
+            tokenize=True,
+            add_generation_prompt=False,
+        )
         r = requests.post(
             f"{SERVER_URL}/restore_snapshot",
             json={
@@ -119,9 +153,8 @@ class TestMambaStatefulInference(unittest.TestCase):
             max_tokens=60,
         )
         self.assertIn("choices", t1, f"Turn 1 failed: {t1}")
-        time.sleep(0.3)
 
-        # Save snapshot after Turn 1
+        # Save snapshot after Turn 1 (polling ensures auto-snapshot completed)
         snap = self._save_snapshot(rid)
         self.assertTrue(snap.get("success"), f"Snapshot save failed: {snap}")
 
@@ -149,7 +182,6 @@ class TestMambaStatefulInference(unittest.TestCase):
         )
         self.assertIn("choices", t1)
         t1_text = t1["choices"][0]["message"]["content"]
-        time.sleep(0.3)
 
         snap = self._save_snapshot(rid)
         self.assertTrue(snap.get("success"))
@@ -200,7 +232,7 @@ class TestMambaStatefulInference(unittest.TestCase):
             max_tokens=60,
         )
         self.assertIn("choices", t1)
-        time.sleep(0.3)
+
         snap1 = self._save_snapshot(rid1)
         self.assertTrue(snap1.get("success"), f"Turn1 snap failed: {snap1}")
 
@@ -208,7 +240,6 @@ class TestMambaStatefulInference(unittest.TestCase):
         # _stateful_generate creates a restored-* Req with conversation_id=rid1.
         # After it completes, EVERY_TURN auto-snapshot has Turn2 state in WARM under rid1.
         r2 = self._stateful_generate(rid1, "Also, my lucky number is 7. Got it?")
-        time.sleep(0.3)
         # Save Turn2 state: use rid1 as key — handle_save_snapshot falls back to
         # WARM tier via effective_conv_id=rid1, persisting Turn2 state to COLD.
         snap2 = self._save_snapshot(rid1)
@@ -252,7 +283,6 @@ class TestMambaStatefulInference(unittest.TestCase):
         )
         self.assertIn("choices", t1)
         t1_text = t1["choices"][0]["message"]["content"]
-        time.sleep(0.3)
 
         snap = self._save_snapshot(rid)
         self.assertTrue(snap.get("success"))
