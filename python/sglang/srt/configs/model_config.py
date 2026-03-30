@@ -398,11 +398,16 @@ class ModelConfig:
 
     def _derive_model_shapes(self):
         # Unify the config keys for hf_text_config
-        self.head_dim = getattr(
-            self.hf_text_config,
-            "head_dim",
-            self.hf_text_config.hidden_size // self.hf_text_config.num_attention_heads,
-        )
+        # Use hasattr + conditional to avoid eagerly evaluating the fallback
+        # (pure Mamba models lack num_attention_heads and the getattr default
+        # would raise AttributeError even when head_dim is present).
+        if hasattr(self.hf_text_config, "head_dim"):
+            self.head_dim = self.hf_text_config.head_dim
+        elif hasattr(self.hf_text_config, "num_attention_heads"):
+            self.head_dim = self.hf_text_config.hidden_size // self.hf_text_config.num_attention_heads
+        else:
+            # Pure SSM models without head_dim: use hidden_size as a safe default
+            self.head_dim = self.hf_text_config.hidden_size
         self.v_head_dim = getattr(
             self.hf_text_config,
             "v_head_dim",
@@ -530,7 +535,9 @@ class ModelConfig:
 
             self.attention_arch = AttentionArch.MHA
 
-        self.num_attention_heads = self.hf_text_config.num_attention_heads
+        self.num_attention_heads = getattr(
+            self.hf_text_config, "num_attention_heads", 0
+        )
         self.num_key_value_heads = getattr(
             self.hf_text_config, "num_key_value_heads", None
         )
@@ -624,8 +631,9 @@ class ModelConfig:
                 return num_kv_heads
 
         # For non-grouped-query attention models, the number of KV heads is
-        # equal to the number of attention heads.
-        return self.hf_text_config.num_attention_heads
+        # equal to the number of attention heads. Pure SSM models (no attention)
+        # have 0 KV heads.
+        return getattr(self.hf_text_config, "num_attention_heads", 0)
 
     def get_num_kv_heads(self, tensor_parallel_size) -> int:
         """Returns the number of KV heads per GPU."""

@@ -1,6 +1,31 @@
-# SGLang-Mamba Test Suite — Phase Documents
+# SGLang-Mamba Test Suite
 
-Each file in this directory is a self-contained agent prompt for one phase of the test plan. A fresh Claude Code session can pick up any phase document and execute it autonomously.
+Self-contained test program for Mamba SSM snapshot persistence. Each phase document in `prompts/` is an agent prompt that a fresh Claude Code session can pick up and execute autonomously.
+
+## Directory Layout
+
+```
+test/phases/
+├── README.md           ← you are here
+├── prompts/            Phase definition docs (agent prompts)
+│   ├── phase-00-*.md     Phase 0: Environment Verification
+│   ├── phase-01-*.md     Phase 1: Stateless Inference Baseline
+│   ├── ...
+│   └── phase-10-*.md     Phase 10: Scaling Plan
+├── scripts/            Runnable test scripts and tools
+│   ├── phase-10-scaling.py        Resource monitor + load test runner
+│   ├── phase-10-h-small-test.py   Granite-specific test script
+│   └── download-model.sh          Model download helper
+├── infra/              Infrastructure and configuration
+│   ├── config.sh       Single source of truth: MODEL_PATH, PORT, SNAPSHOT_DIR
+│   ├── codemap.md      File/line/method reference for all source code
+│   ├── BOOTSTRAP_FRESH_VM.md  Fresh VM bootstrap instructions
+│   └── NEW_VM_SETUP.md        New VM setup guide
+└── results/            Test results and reports
+    ├── INDEX.md        Master index with summaries of every phase
+    ├── phase-NN-*.md   Individual phase result reports
+    └── phase-10-logs/  Raw JSON/CSV data from Phase 10
+```
 
 ## Phase Dependency Graph
 
@@ -13,41 +38,37 @@ Phase 0 (Environment Verification)
                     │     └─► Phase 5 (Mamba2Metadata Integrity) ◄─ no server
                     │           └─► Phase 6 (extra_buffer Strategy)
                     │                 └─► Phase 7 (Snapshot System)
-                    │                       └─► Phase 8 (Gauntlet / Stress)
+                    │                       └─► Phase 8 (Stateful Inference)
+                    │                             └─► Phase 9 (Gauntlet / Stress)
+                    │                                   └─► Phase 10 (Scaling)
                     └─► (can also run Phase 2, 3, 5 in parallel after Phase 1)
 ```
 
-## Index
+## Quick Start
 
-| File | Phase | Requires Server | New Test File |
-|------|-------|-----------------|---------------|
-| `phase-00-environment-verification.md` | 0 — Pre-flight | No | None |
-| `phase-01-stateless-inference-baseline.md` | 1 — Baseline Inference | Yes (`--disable-radix-cache`) | `test_mamba_baseline_inference.py` |
-| `phase-02-mamba-pool-unit-tests.md` | 2 — MambaPool Unit Tests | No | `test_mamba_pool_extended.py` |
-| `phase-03-mamba-radix-cache-component-tests.md` | 3 — RadixCache Gauntlet | No | `test_mamba_radix_cache_gauntlet.py` |
-| `phase-04-live-server-integration-no-buffer.md` | 4 — Server + RadixCache | Yes (`no_buffer`) | `test_mamba_radix_cache_server_integration.py` |
-| `phase-05-mamba2metadata-integrity.md` | 5 — Metadata Integrity | No | `test_mamba_metadata.py` |
-| `phase-06-extra-buffer-strategy.md` | 6 — extra_buffer Mode | Yes (`extra_buffer`) | `test_mamba_extra_buffer.py` |
-| `phase-07-snapshot-system.md` | 7 — Snapshot E2E | Yes (`--enable-mamba-snapshots`) | `test_mamba_snapshot_e2e.py` |
-| `phase-08-gauntlet-stress-tests.md` | 8 — Stress / Gauntlet | Yes | `test_mamba_gauntlet_stress.py` |
+```bash
+# 1. Configure (edit MODEL_PATH if needed)
+source test/phases/infra/config.sh
+
+# 2. Run a phase by feeding its prompt doc to an agent
+#    e.g. phase-01:
+cat test/phases/prompts/phase-01-stateless-inference-baseline.md
+
+# 3. Check results
+cat test/phases/results/INDEX.md
+```
 
 ## Configuration
 
-`config.sh` — single source of truth for `MODEL_PATH`, `MODEL_NAME`, `SERVER_PORT`, `SNAPSHOT_DIR`, and `RESULTS_DIR`. All phase documents source this file at the top of their Environment Setup section:
+`infra/config.sh` — single source of truth for `MODEL_PATH`, `MODEL_NAME`, `SERVER_PORT`, `SNAPSHOT_DIR`, and `RESULTS_DIR`. All phase prompts source this file.
 
-```bash
-source test/phases/config.sh
-```
-
-**To test a different model**: edit `MODEL_PATH` and `MODEL_NAME` in `config.sh` only. All phases pick it up automatically, and the `MODEL_NAME` variable is embedded in every report filename so results from different models don't collide.
+**To test a different model**: edit `MODEL_PATH` and `MODEL_NAME` in `config.sh` only. All phases pick it up automatically.
 
 ## Results
 
-Each phase writes a detailed markdown report to `test/phases/results/phase-NN-<model>-<date>.md`. The `results/` directory is created automatically by `config.sh`. Reports include: per-test pass/fail table, HITL transcripts, tracebacks, server log excerpts, and phase-specific observations.
+All results in `results/`. Start with `results/INDEX.md` for the master summary with per-phase pass/fail, key findings, and cross-phase bug tracker.
 
-## Codemap
-
-`codemap.md` — precise file paths, line numbers, method signatures, and field invariants for every component touched across all phases. Sourced from the original agent prompt's citation block. Read this first when implementing any phase.
+Each phase writes a detailed markdown report named `phase-NN-<model>-<date>.md`. Reports include: per-test pass/fail table, HITL transcripts, tracebacks, server log excerpts, and phase-specific observations.
 
 ## Common Conventions
 

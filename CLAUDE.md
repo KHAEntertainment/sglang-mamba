@@ -37,7 +37,7 @@ Testing priority: granite → Nemotron (if OOM) → granite-q4 (comparison)
 
 ```bash
 # Start server (primary model)
-source test/phases/config.sh
+source test/phases/infra/config.sh
 python -m sglang.launch_server \
   --model-path $MODEL_PATH \
   --enable-snapshot-persistence \
@@ -47,8 +47,8 @@ python -m sglang.launch_server \
   --port $SERVER_PORT
 
 # Run a test phase (example: phase 1)
-source test/phases/config.sh
-bash test/phases/phase-01-stateless-inference-baseline.md  # follow phase doc
+# Feed the prompt doc to an agent session:
+cat test/phases/prompts/phase-01-stateless-inference-baseline.md
 
 # Unit tests (no server needed)
 pytest python/sglang/test/srt/test_mamba_pool_extended.py -v
@@ -67,18 +67,20 @@ pre-commit run --all-files
 
 | Phase | Description | Result |
 |-------|-------------|--------|
-| 0 | Environment verification | **PASS** |
-| 1 | Stateless inference baseline | INCOMPLETE — run first on A100 |
+| 0 | Environment verification | **PASS** (10/12, 2 fixture bugs) |
+| 1 | Stateless inference baseline | **PASS** (7/7) |
 | 2 | MambaPool unit tests | **PASS** (5/5) |
 | 3 | MambaRadixCache gauntlet | **PASS** (16/16) |
-| 4 | Live server — no_buffer strategy | INCOMPLETE |
+| 4 | Live server — no_buffer strategy | **PASS** (5/5) |
 | 5 | Mamba2Metadata integrity | **PASS** (5/5) |
-| 6 | extra_buffer strategy | INCOMPLETE |
-| 7 | Snapshot system e2e | INCOMPLETE — validates Gap fixes PRs #4 #6 |
-| 8 | Gauntlet stress tests | INCOMPLETE |
+| 6 | extra_buffer strategy | PARTIAL (unit only, no compatible model) |
+| 7 | Snapshot system e2e | **PASS** (6/6, 7 bugs fixed) |
+| 8 | True stateful inference | **PASS** (4/4, 93.8% token savings) |
+| 9 | Gauntlet stress tests | **PASS** (6/6, 0 errors) |
+| 10 | Cross-model scaling | **PASS** (Nemotron 5/5, Granite 4/5, pure Mamba2 incompatible) |
 
-Resume order: **1 → 4 → 7 → 6 → 8**. Stop at first failure and diagnose.
-Phase docs + config: `test/phases/` | Results: `test/phases/results/`
+Full results index: `test/phases/results/INDEX.md`
+Phase docs: `test/phases/prompts/` | Config: `test/phases/infra/` | Scripts: `test/phases/scripts/`
 
 ---
 
@@ -126,4 +128,4 @@ Linear project ID: `f7f1cb8c-c4cd-4b63-83f6-58b9ddba6ce8`
 | `python/sglang/srt/snapshot/mamba_snapshot.py` | MambaSnapshotMetadata, save/load |
 | `python/sglang/srt/snapshot/tier_manager.py` | WARM tier preload on startup |
 | `python/sglang/srt/managers/scheduler.py` | handle_save/restore_snapshot, create_new_request |
-| `test/phases/config.sh` | Single source of truth for MODEL_PATH, PORT, SNAPSHOT_DIR |
+| `test/phases/infra/config.sh` | Single source of truth for MODEL_PATH, PORT, SNAPSHOT_DIR |
