@@ -325,22 +325,62 @@ print(response.choices[0].message.content)
 
 ---
 
-## Benchmarks
+## Benchmark Results
 
-### Snapshot Overhead
-- **Save**: 10-50ms for typical conversation states
-- **Restore**: 5-30ms (faster than save)
-- **Disk I/O**: <100ms for safetensors serialization
+Validated on **granite-4.0-h-tiny** (IBM Granite 4.0-H hybrid architecture)
+across 13 test phases including stress testing, context scaling, and crash
+resilience. Cross-model compatibility confirmed on Nemotron-Cascade-2-30B
+(NVIDIA, MoE hybrid).
 
-### Multi-turn Speedup
+### Stress Testing (Phase 10a)
+| Metric | Result |
+|--------|--------|
+| Total requests | 271 |
+| Failures | 0 |
+| Token reduction vs stateless | 93.8% |
+| Memory leaks | 0 |
 
-| Conversation Length | Stateless (Total) | Stateful (Total) | Speedup |
-|---------------------|-------------------|------------------|---------|
-| 5 turns | 8.2s | 0.9s | **9.1x** |
-| 10 turns | 28.5s | 1.5s | **19x** |
-| 20 turns | 112s | 2.8s | **40x** |
+### Context Window Scaling (Phase 10e) — A100 80GB
+| Context Length | Snapshot Size | Warm Restore | Save Latency |
+|---------------|---------------|--------------|--------------|
+| 2K tokens | 54.7 MB | 2ms | 72ms |
+| 8K tokens | 55.1 MB | 2ms | 89ms |
+| 32K tokens | 55.4 MB | 3ms | 134ms |
+| 64K tokens | 55.7 MB | 3ms | 161ms |
+| 128K tokens | 55.9 MB | 3ms | 193ms |
 
-*Tested on `mamba-2.8b` with average 30 tokens/turn on A100 GPU*
+**Snapshot size is architecturally constant.** Transformer KV cache at 128K
+context would be multiple gigabytes. Mamba SSM state remains ~56MB regardless
+of conversation length.
+
+### Stateful vs Stateless Latency
+| Method | 128K context | Speedup |
+|--------|-------------|---------|
+| Stateless (full prefill) | 6.5s | — |
+| Stateful (warm restore) | ~2ms | **~3,250x** |
+
+Efficiency gains *increase* with context length. The longer the conversation,
+the larger the advantage.
+
+### Crash Resilience (Phase 10f)
+| Scenario | Result |
+|----------|--------|
+| Client disconnect mid-stream | Clean recovery |
+| SIGKILL mid-inference | Snapshot intact, auto-preloaded on restart |
+| SIGKILL during snapshot write | Atomic write — no partial files, ever |
+| Graceful SIGTERM | Hang >61s (scheduler drain — tracked as KHA-174) |
+| Abort + snapshot save | Pre-free hook captured state before abort |
+
+### Cross-Model Compatibility
+| Model | Architecture | Tests | Result |
+|-------|-------------|-------|--------|
+| granite-4.0-h-tiny (4B) | Dense hybrid | Phases 0-10f | Full validation |
+| Nemotron-Cascade-2-30B | MoE hybrid | Phase 10c (5 tests) | 5/5, 0.059s latency |
+| granite-4.0-h-small (32B) | Dense hybrid | Phase 10b (5 tests) | 4/5 |
+
+**Note:** 32B and 30B models were memory-constrained on the A100 80GB test hardware.
+Full gauntlet (128K context, 271 requests) only fits on the 4B model.
+
 
 ---
 
