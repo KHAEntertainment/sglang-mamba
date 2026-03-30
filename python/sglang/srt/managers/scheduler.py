@@ -2795,6 +2795,22 @@ class Scheduler(
             return False
         return True
 
+    def _cleanup_queued_request_resources(self, req: Req) -> None:
+        """Release resources held by a request that was already admitted to a queue."""
+        if self.disaggregation_mode == DisaggregationMode.DECODE:
+            release_kv_cache(req, self.tree_cache)
+
+        if self.disaggregation_mode == DisaggregationMode.PREFILL:
+            release_req_to_metadata_buffer(
+                req, self.req_to_metadata_buffer_idx_allocator
+            )
+
+        if (
+            req.mamba_pool_idx is not None
+            and self.disaggregation_mode != DisaggregationMode.DECODE
+        ):
+            release_kv_cache(req, self.tree_cache, is_insert=False)
+
     def _abort_on_queued_limit(self, recv_req: Req) -> bool:
         """Abort an incoming or existing request if the waiting queue is full. Returns True if the incoming request is aborted."""
         if (
@@ -2841,6 +2857,8 @@ class Scheduler(
             ),
             req_to_abort,
         )
+        if req_to_abort is not recv_req:
+            self._cleanup_queued_request_resources(req_to_abort)
         return req_to_abort.rid == recv_req.rid
 
     def _abort_on_waiting_timeout(self):
@@ -2866,6 +2884,7 @@ class Scheduler(
                     ),
                     req,
                 )
+                self._cleanup_queued_request_resources(req)
                 deleted_reqs.add(req)
 
         if deleted_reqs:
