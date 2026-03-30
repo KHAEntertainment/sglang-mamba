@@ -314,3 +314,43 @@ def test_abort_on_waiting_timeout_frees_mamba_slot_for_timed_out_request():
     assert scheduler.waiting_queue == []
     mamba_pool.free.assert_called_once()
     assert timed_out_req.mamba_pool_idx is None
+
+
+def test_trigger_snapshot_hooks_skips_finished_decode_requests():
+    scheduler = Scheduler.__new__(Scheduler)
+    scheduler.snapshot_hook_manager = Mock()
+    scheduler.req_to_token_pool = SimpleNamespace(mamba_pool=Mock())
+
+    req = Mock()
+    req.mamba_pool_idx = torch.tensor(1, dtype=torch.int64)
+    req.finished.return_value = True
+    req.output_ids = [1, 2, 3]
+
+    batch = SimpleNamespace(
+        reqs=[req],
+        forward_mode=SimpleNamespace(is_decode=lambda: True),
+    )
+
+    scheduler._trigger_snapshot_hooks(batch)
+
+    scheduler.snapshot_hook_manager.trigger_post_forward.assert_not_called()
+
+
+def test_trigger_snapshot_hooks_keeps_finished_non_decode_requests():
+    scheduler = Scheduler.__new__(Scheduler)
+    scheduler.snapshot_hook_manager = Mock()
+    scheduler.req_to_token_pool = SimpleNamespace(mamba_pool=Mock())
+
+    req = Mock()
+    req.mamba_pool_idx = torch.tensor(2, dtype=torch.int64)
+    req.finished.return_value = True
+    req.output_ids = [4, 5]
+
+    batch = SimpleNamespace(
+        reqs=[req],
+        forward_mode=SimpleNamespace(is_decode=lambda: False),
+    )
+
+    scheduler._trigger_snapshot_hooks(batch)
+
+    scheduler.snapshot_hook_manager.trigger_post_forward.assert_called_once()

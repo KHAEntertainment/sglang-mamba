@@ -3613,7 +3613,7 @@ class Scheduler(
                 continue
 
             # Finished decode reqs already snapshotted via the pre-free hook
-            if req.finished():
+            if batch.forward_mode.is_decode() and req.finished():
                 continue
 
             # Calculate turn number (approximate based on output length)
