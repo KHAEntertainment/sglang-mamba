@@ -191,7 +191,7 @@ As AI shifts from tool to partner, the partner model wins.
 
 ## The Bottom Line
 
-We've made AI conversations **10x cheaper and 10x faster** by letting AI remember instead of reprocess.
+We've made AI conversations **dramatically cheaper (up to 30x) and 10x faster** by letting AI remember instead of reprocess.
 
 This isn't an incremental improvement—it's a fundamental shift in how AI systems handle multi-turn interactions. We've proven it works across multiple model architectures with rigorous testing. For any business relying on AI-powered conversations, this changes the economics of what's possible.
 
