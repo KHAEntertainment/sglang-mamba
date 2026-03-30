@@ -1,0 +1,13 @@
+{
+  "duration_s": 15.2,
+  "samples": 4,
+  "gpu_vram_start_mb": 69810,
+  "gpu_vram_end_mb": 69810,
+  "gpu_vram_delta_mb": 0,
+  "gpu_vram_max_mb": 69810,
+  "proc_rss_start_mb": 10286,
+  "proc_rss_end_mb": 10286,
+  "proc_rss_delta_mb": 0,
+  "proc_rss_max_mb": 10286,
+  "snapshots_end": 0
+}

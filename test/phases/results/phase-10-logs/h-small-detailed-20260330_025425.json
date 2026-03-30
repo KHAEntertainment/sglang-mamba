@@ -1,0 +1,173 @@
+{
+  "model": "granite-4.0-h-small",
+  "timestamp": "20260330_025425",
+  "tests": [
+    {
+      "name": "sequential_snapshots",
+      "conversations": 20,
+      "snapshots_saved": 1,
+      "pass": false
+    },
+    {
+      "name": "multi_turn_single_conv",
+      "turns": 8,
+      "pass": true
+    },
+    {
+      "name": "rapid_fire_baseline",
+      "total": 100,
+      "errors": 0,
+      "gpu_delta_mb": 0,
+      "rss_delta_mb": 9,
+      "pass": true
+    },
+    {
+      "name": "long_context_snapshot",
+      "prompt_tokens": 2015,
+      "save_success": true,
+      "pass": true
+    },
+    {
+      "name": "snapshot_directory_analysis",
+      "conversations": 182,
+      "safetensors_files": 17,
+      "total_size_mb": 2477.6,
+      "pass": true
+    }
+  ],
+  "metrics": [
+    {
+      "i": 0,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 1,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 2,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 3,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 4,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 5,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 6,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 7,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 8,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 9,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 10,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 11,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 12,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 13,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 14,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 15,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 16,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 17,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 18,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    },
+    {
+      "i": 19,
+      "gpu_mb": 70244,
+      "rss_mb": 14652,
+      "snapshots": 1
+    }
+  ],
+  "resources": {
+    "gpu_start_mb": 70244,
+    "gpu_end_mb": 70500,
+    "gpu_delta_mb": 256,
+    "rss_start_mb": 14647,
+    "rss_end_mb": 14668,
+    "rss_delta_mb": 21
+  },
+  "health_after": true,
+  "summary": {
+    "total": 5,
+    "passed": 4
+  }
+}
