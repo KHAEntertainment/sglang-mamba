@@ -45,9 +45,12 @@ from sglang.srt.utils.common import rank0_log
 
 if not is_cpu() and not is_npu():
     # fix import error on CPU device, no impacts when non-CPU path
-    from sglang.jit_kernel.cutedsl_gdn import (
-        cutedsl_fused_sigmoid_gating_delta_rule_update,
-    )
+    try:
+        from sglang.jit_kernel.cutedsl_gdn import (
+            cutedsl_fused_sigmoid_gating_delta_rule_update,
+        )
+    except (ImportError, ModuleNotFoundError):
+        cutedsl_fused_sigmoid_gating_delta_rule_update = None
     from sglang.srt.layers.attention.fla.chunk import chunk_gated_delta_rule
     from sglang.srt.layers.attention.fla.chunk_delta_h import (
         CHUNK_SIZE as FLA_CHUNK_SIZE,
