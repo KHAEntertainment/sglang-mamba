@@ -1331,6 +1331,8 @@ class UpdateWeightFromDiskReqInput(BaseReq):
     token_step: int = 0
     # Whether to flush the cache after updating weights
     flush_cache: bool = True
+    # Tensor metadata
+    manifest: Optional[Dict[str, Any]] = None
 
 
 @dataclass
