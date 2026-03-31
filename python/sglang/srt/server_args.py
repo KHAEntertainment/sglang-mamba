@@ -1849,6 +1849,68 @@ class ServerArgs:
                 "flashinfer" if is_flashinfer_available() else "pytorch"
             )
 
+
+    def _get_default_attn_backend(self, use_mla_backend: bool, model_config):
+        """
+        Auto select the fastest attention backend.
+
+        1. Models with MHA Architecture (e.g: Llama, QWen)
+            1.1 We will turn on FA3 on hopper unless user use spec decode with topk > 1 or page_size > 1.
+            1.2 Use trtllm_mha for SM100/SM103 (Blackwell B200/GB200/B300) excluding spec with topk > 1.
+               Note: trtllm_mha does not support SM120, which will fall back to flashinfer.
+            1.3 In other cases, we will use flashinfer if available, otherwise use triton.
+        2. Models with MLA Architecture and using FA3
+            2.1 We will use FA3 backend on hopper.
+            2.2 We will use Flashinfer backend on blackwell.
+            2.3 Otherwise, we will use triton backend.
+        """
+        # Whisper requires flashinfer for cross-attention CUDA graph support
+        if "WhisperForConditionalGeneration" in (
+            model_config.hf_config.architectures or []
+        ):
+            return "flashinfer"
+
+        if not use_mla_backend:
+            # MHA architecture
+            if is_hopper_with_cuda_12_3() and is_no_spec_infer_or_topk_one(self):
+                # Note: flashinfer 0.6.1 caused performance regression on Hopper attention kernel
+                # Before the kernel is fixed, we choose fa3 as the default backend on Hopper MHA
+                # ref: https://github.com/sgl-project/sglang/issues/17411
+                return "fa3"
+            elif (
+                is_sm100_supported()
+                and is_no_spec_infer_or_topk_one(self)
+                and (
+                    self.speculative_algorithm is None
+                    or self.speculative_eagle_topk is not None
+                )
+            ):
+                return "trtllm_mha"
+            elif is_hip():
+                return "aiter"
+            elif is_mps():
+                return "torch_native"
+            else:
+                return "flashinfer" if is_flashinfer_available() else "triton"
+        else:
+            # MLA architecture
+            if is_hopper_with_cuda_12_3():
+                return "fa3"
+            elif is_sm100_supported():
+                return "flashinfer"
+            elif is_hip():
+                head_num = model_config.get_num_kv_heads(self.tp_size)
+                # TODO current aiter only support head number 16 or 128 head number
+                if head_num == 128 or head_num == 16:
+                    return "aiter"
+                else:
+                    return "triton"
+            elif is_mps():
+                return "torch_native"
+            else:
+                return "triton"
+
+
     def _handle_attention_backend_compatibility(self):
         model_config = self.get_model_config()
         use_mla_backend = self.use_mla_backend()
@@ -1932,12 +1994,16 @@ class ServerArgs:
                 self.speculative_algorithm is None
             ), "Speculative decoding is currently not supported with Flex Attention backend"
 
-        # Encoder-decoder models (e.g., Whisper)
-        if model_config.is_encoder_decoder:
-            logger.warning(
-                "Cuda graph is disabled for encoder-decoder models (e.g., Whisper)"
-            )
-            self.disable_cuda_graph = True
+        # Whisper's encoder token padding conflicts with prefix caching.
+        # Only disable for Whisper; other encoder-decoder models (e.g., mllama) use radix cache.
+        if (
+            model_config.is_encoder_decoder
+            and not self.disable_radix_cache
+            and "WhisperForConditionalGeneration"
+            in (model_config.hf_config.architectures or [])
+        ):
+            logger.info("Radix cache is disabled for Whisper")
+            self.disable_radix_cache = True
 
         # Major NVIDIA platforms backends
         if (
