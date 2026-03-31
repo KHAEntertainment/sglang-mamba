@@ -85,6 +85,7 @@ from sglang.srt.managers.io_struct import (
     ClearHiCacheReqOutput,
     CloseSessionReqInput,
     ContinueGenerationReqInput,
+    DeleteSnapshotReqInput,
     DestroyWeightsUpdateGroupReqInput,
     DetachHiCacheStorageReqInput,
     DetachHiCacheStorageReqOutput,
@@ -101,12 +102,10 @@ from sglang.srt.managers.io_struct import (
     GetSnapshotInfoReqInput,
     GetWeightsByNameReqInput,
     HealthCheckOutput,
-    ListSnapshotsReqInput,
-    RestoreSnapshotReqInput,
-    DeleteSnapshotReqInput,
     InitWeightsSendGroupForRemoteInstanceReqInput,
     InitWeightsSendGroupForRemoteInstanceReqOutput,
     InitWeightsUpdateGroupReqInput,
+    ListSnapshotsReqInput,
     LoadLoRAAdapterFromTensorsReqInput,
     LoadLoRAAdapterFromTensorsReqOutput,
     LoadLoRAAdapterReqInput,
@@ -116,6 +115,7 @@ from sglang.srt.managers.io_struct import (
     PauseGenerationReqInput,
     ProfileReq,
     ReleaseMemoryOccupationReqInput,
+    RestoreSnapshotReqInput,
     ResumeMemoryOccupationReqInput,
     RpcReqInput,
     RpcReqOutput,
@@ -146,7 +146,6 @@ from sglang.srt.managers.schedule_batch import (
     ModelWorkerBatch,
     MultimodalInputs,
     Req,
-    RequestStage,
     ScheduleBatch,
 )
 from sglang.srt.managers.schedule_policy import (
@@ -156,11 +155,6 @@ from sglang.srt.managers.schedule_policy import (
 )
 from sglang.srt.managers.scheduler_dp_attn_mixin import SchedulerDPAttnMixin
 from sglang.srt.managers.scheduler_input_blocker import SchedulerInputBlocker
-from sglang.srt.managers.scheduler_metrics_mixin import (
-    RECORD_STEP_TIME,
-    PrefillStats,
-    SchedulerMetricsMixin,
-)
 from sglang.srt.managers.scheduler_output_processor_mixin import (
     SchedulerOutputProcessorMixin,
 )
@@ -181,18 +175,20 @@ from sglang.srt.mem_cache.common import release_kv_cache
 from sglang.srt.mem_cache.radix_cache import RadixCache
 from sglang.srt.model_executor.forward_batch_info import ForwardMode, PPProxyTensors
 from sglang.srt.multiplex.multiplexing_mixin import SchedulerMultiplexMixin
+from sglang.srt.observability.req_time_stats import (
+    real_time,
+    set_schedule_time_batch,
+    set_time_batch,
+)
+from sglang.srt.observability.scheduler_metrics_mixin import (
+    RECORD_STEP_TIME,
+    PrefillStats,
+    SchedulerMetricsMixin,
+)
+from sglang.srt.observability.trace import process_tracing_init, trace_set_thread_info
 from sglang.srt.parser.reasoning_parser import ReasoningParser
 from sglang.srt.server_args import PortArgs, ServerArgs, get_global_server_args
 from sglang.srt.speculative.spec_info import SpeculativeAlgorithm
-from sglang.srt.tracing.trace import (
-    process_tracing_init,
-    trace_event_batch,
-    trace_set_proc_propagate_context,
-    trace_set_thread_info,
-    trace_slice_batch,
-    trace_slice_end,
-    trace_slice_start,
-)
 from sglang.srt.utils import (
     DynamicGradMode,
     broadcast_pyobj,
@@ -317,7 +313,6 @@ class Scheduler(
         self.enable_metrics_for_all_schedulers = (
             server_args.enable_metrics_for_all_schedulers
         )
-        self.enable_trace = server_args.enable_trace
         self.stream_interval = server_args.stream_interval
         self.spec_algorithm = SpeculativeAlgorithm.from_string(
             server_args.speculative_algorithm
@@ -892,8 +887,8 @@ class Scheduler(
         if server_args.enable_memory_tiers:
             try:
                 from sglang.srt.snapshot import (
-                    MambaHostPool,
                     ConversationTracker,
+                    MambaHostPool,
                     TierManager,
                 )
 
@@ -928,8 +923,12 @@ class Scheduler(
                 )
 
             except Exception as e:
-                logger.error(f"Failed to initialize tier management: {e}", exc_info=True)
-                logger.warning("Tier management disabled, falling back to disk-only snapshots")
+                logger.error(
+                    f"Failed to initialize tier management: {e}", exc_info=True
+                )
+                logger.warning(
+                    "Tier management disabled, falling back to disk-only snapshots"
+                )
                 self.host_pool = None
                 self.conversation_tracker = None
                 self.tier_manager = None
@@ -955,8 +954,10 @@ class Scheduler(
 
             # Extract Mamba state from pool
             try:
-                conv_states, temporal_states = self.snapshot_manager.extract_state_from_pool(
-                    mamba_pool, req.mamba_pool_idx
+                conv_states, temporal_states = (
+                    self.snapshot_manager.extract_state_from_pool(
+                        mamba_pool, req.mamba_pool_idx
+                    )
                 )
             except Exception as e:
                 logger.error(f"Failed to extract Mamba state for snapshot: {e}")
@@ -985,7 +986,11 @@ class Scheduler(
                 req_pool_idx=int(req.req_pool_idx),
                 layer_config=layer_config,
                 fill_ids=(
-                    (req.fill_ids.tolist() if hasattr(req.fill_ids, "tolist") else list(req.fill_ids))
+                    (
+                        req.fill_ids.tolist()
+                        if hasattr(req.fill_ids, "tolist")
+                        else list(req.fill_ids)
+                    )
                     if hasattr(req, "fill_ids") and req.fill_ids is not None
                     else None
                 ),
@@ -1111,25 +1116,34 @@ class Scheduler(
             return SaveSnapshotReqOutput(
                 success=False,
                 snapshot_id=None,
-                message="Snapshot system not enabled. Start server with --enable-mamba-snapshots"
+                message="Snapshot system not enabled. Start server with --enable-mamba-snapshots",
             )
 
         try:
             effective_conv_id = recv_req.conversation_id or recv_req.rid
-            effective_snapshot_id = recv_req.snapshot_id or f"{effective_conv_id}-t{recv_req.turn_number or 0}"
+            effective_snapshot_id = (
+                recv_req.snapshot_id
+                or f"{effective_conv_id}-t{recv_req.turn_number or 0}"
+            )
 
             # Find the request by rid
             req = self._find_request_by_rid(recv_req.rid)
             if req is None:
                 # Request already completed — check WARM tier for auto-saved state
-                if self.tier_manager is not None and self.tier_manager.host_pool.has_state(effective_conv_id):
+                if (
+                    self.tier_manager is not None
+                    and self.tier_manager.host_pool.has_state(effective_conv_id)
+                ):
                     # State was auto-saved to WARM tier; persist to COLD tier now
-                    warm_result = self.tier_manager.restore_from_warm_tier(effective_conv_id)
+                    warm_result = self.tier_manager.restore_from_warm_tier(
+                        effective_conv_id
+                    )
                     if warm_result is not None:
                         conv_states_w, temporal_states_w, meta_dict = warm_result
                         snap_meta = MambaSnapshotMetadata(
                             conversation_id=effective_conv_id,
-                            turn_number=recv_req.turn_number or meta_dict.get("turn_number", 0),
+                            turn_number=recv_req.turn_number
+                            or meta_dict.get("turn_number", 0),
                             branch_name=recv_req.branch_name,
                             timestamp=time.time(),
                             token_count=int(meta_dict.get("token_count", 0)),
@@ -1137,9 +1151,15 @@ class Scheduler(
                             mamba_pool_idx=int(meta_dict.get("mamba_pool_idx", 0)),
                             req_pool_idx=int(meta_dict.get("req_pool_idx", 0)),
                             layer_config=meta_dict.get("layer_config", {}),
-                            fill_ids=[int(x) for x in meta_dict["fill_ids"]] if meta_dict.get("fill_ids") is not None else None,
+                            fill_ids=(
+                                [int(x) for x in meta_dict["fill_ids"]]
+                                if meta_dict.get("fill_ids") is not None
+                                else None
+                            ),
                         )
-                        self.snapshot_manager.save_snapshot(conv_states_w, temporal_states_w, snap_meta)
+                        self.snapshot_manager.save_snapshot(
+                            conv_states_w, temporal_states_w, snap_meta
+                        )
                         logger.info(
                             f"Manual snapshot saved from WARM tier: conversation={effective_conv_id}, "
                             f"snapshot_id={effective_snapshot_id}"
@@ -1147,34 +1167,34 @@ class Scheduler(
                         return SaveSnapshotReqOutput(
                             success=True,
                             snapshot_id=effective_snapshot_id,
-                            message="Snapshot saved successfully (from WARM tier)"
+                            message="Snapshot saved successfully (from WARM tier)",
                         )
                 return SaveSnapshotReqOutput(
                     success=False,
                     snapshot_id=None,
-                    message=f"Request not found and no WARM tier state for: {recv_req.rid}"
+                    message=f"Request not found and no WARM tier state for: {recv_req.rid}",
                 )
 
             # Check if request has mamba state
-            if not hasattr(req, 'mamba_pool_idx') or req.mamba_pool_idx is None:
+            if not hasattr(req, "mamba_pool_idx") or req.mamba_pool_idx is None:
                 return SaveSnapshotReqOutput(
                     success=False,
                     snapshot_id=None,
-                    message="Request does not have Mamba state (not a Mamba model or state not allocated)"
+                    message="Request does not have Mamba state (not a Mamba model or state not allocated)",
                 )
 
             # Get mamba_pool from req_to_token_pool
             mamba_pool = getattr(self.req_to_token_pool, "mamba_pool", None)
             if mamba_pool is None:
                 return SaveSnapshotReqOutput(
-                    success=False,
-                    snapshot_id=None,
-                    message="Mamba pool not available"
+                    success=False, snapshot_id=None, message="Mamba pool not available"
                 )
 
             # Extract state from live pool
-            conv_states, temporal_states = self.snapshot_manager.extract_state_from_pool(
-                mamba_pool, req.mamba_pool_idx
+            conv_states, temporal_states = (
+                self.snapshot_manager.extract_state_from_pool(
+                    mamba_pool, req.mamba_pool_idx
+                )
             )
 
             # Build metadata
@@ -1193,13 +1213,19 @@ class Scheduler(
                 mamba_pool_idx=int(req.mamba_pool_idx),
                 req_pool_idx=int(req.req_pool_idx),
                 layer_config=layer_config,
-                fill_ids=(req.fill_ids.tolist() if hasattr(req.fill_ids, "tolist") else list(req.fill_ids)) if hasattr(req, "fill_ids") and req.fill_ids is not None else None,
+                fill_ids=(
+                    (
+                        req.fill_ids.tolist()
+                        if hasattr(req.fill_ids, "tolist")
+                        else list(req.fill_ids)
+                    )
+                    if hasattr(req, "fill_ids") and req.fill_ids is not None
+                    else None
+                ),
             )
 
             # Save snapshot
-            self.snapshot_manager.save_snapshot(
-                conv_states, temporal_states, metadata
-            )
+            self.snapshot_manager.save_snapshot(conv_states, temporal_states, metadata)
 
             logger.info(
                 f"Manual snapshot saved: conversation={effective_conv_id}, "
@@ -1209,7 +1235,7 @@ class Scheduler(
             return SaveSnapshotReqOutput(
                 success=True,
                 snapshot_id=effective_snapshot_id,
-                message="Snapshot saved successfully"
+                message="Snapshot saved successfully",
             )
 
         except Exception as e:
@@ -1217,7 +1243,7 @@ class Scheduler(
             return SaveSnapshotReqOutput(
                 success=False,
                 snapshot_id=None,
-                message=f"Error saving snapshot: {str(e)}"
+                message=f"Error saving snapshot: {str(e)}",
             )
 
     def handle_list_snapshots(self, recv_req):
@@ -1233,14 +1259,14 @@ class Scheduler(
 
         if self.snapshot_manager is None:
             return ListSnapshotsReqOutput(
-                success=False,
-                snapshots=None,
-                message="Snapshot system not enabled"
+                success=False, snapshots=None, message="Snapshot system not enabled"
             )
 
         try:
             # Get all turn-based snapshots for this conversation
-            turn_numbers = self.snapshot_manager.list_snapshots(recv_req.conversation_id)
+            turn_numbers = self.snapshot_manager.list_snapshots(
+                recv_req.conversation_id
+            )
 
             # Load metadata for each turn
             snapshot_list = []
@@ -1261,9 +1287,7 @@ class Scheduler(
                     snapshot_list.append(metadata.to_dict())
 
             return ListSnapshotsReqOutput(
-                success=True,
-                snapshots=snapshot_list,
-                message=None
+                success=True, snapshots=snapshot_list, message=None
             )
 
         except Exception as e:
@@ -1271,7 +1295,7 @@ class Scheduler(
             return ListSnapshotsReqOutput(
                 success=False,
                 snapshots=None,
-                message=f"Error listing snapshots: {str(e)}"
+                message=f"Error listing snapshots: {str(e)}",
             )
 
     def handle_get_snapshot_info(self, recv_req):
@@ -1287,17 +1311,13 @@ class Scheduler(
 
         if self.snapshot_manager is None:
             return GetSnapshotInfoReqOutput(
-                success=False,
-                metadata=None,
-                message="Snapshot system not enabled"
+                success=False, metadata=None, message="Snapshot system not enabled"
             )
 
         try:
             # Load metadata
             metadata = self.snapshot_manager.load_metadata(
-                recv_req.conversation_id,
-                recv_req.turn_number,
-                recv_req.branch_name
+                recv_req.conversation_id, recv_req.turn_number, recv_req.branch_name
             )
 
             if metadata is None:
@@ -1305,13 +1325,11 @@ class Scheduler(
                     success=False,
                     metadata=None,
                     message=f"Snapshot not found: conversation={recv_req.conversation_id}, "
-                            f"turn={recv_req.turn_number}, branch={recv_req.branch_name}"
+                    f"turn={recv_req.turn_number}, branch={recv_req.branch_name}",
                 )
 
             return GetSnapshotInfoReqOutput(
-                success=True,
-                metadata=metadata.to_dict(),
-                message=None
+                success=True, metadata=metadata.to_dict(), message=None
             )
 
         except Exception as e:
@@ -1319,7 +1337,7 @@ class Scheduler(
             return GetSnapshotInfoReqOutput(
                 success=False,
                 metadata=None,
-                message=f"Error getting snapshot info: {str(e)}"
+                message=f"Error getting snapshot info: {str(e)}",
             )
 
     def handle_restore_snapshot(self, recv_req):
@@ -1333,14 +1351,10 @@ class Scheduler(
         """
         from sglang.srt.managers.io_struct import RestoreSnapshotReqOutput
 
-        # Extract request_id for correlation
-        request_id = recv_req.request_id
-
         if self.snapshot_manager is None:
             return RestoreSnapshotReqOutput(
                 success=False,
                 message="Snapshot system not enabled. Start server with --enable-mamba-snapshots",
-                request_id=request_id,
             )
 
         # Derive effective_conv_id once for both paths
@@ -1353,29 +1367,26 @@ class Scheduler(
                 mamba_pool = getattr(self.req_to_token_pool, "mamba_pool", None)
                 if mamba_pool is None:
                     return RestoreSnapshotReqOutput(
-                        success=False,
-                        message="Mamba pool not available",
-                        request_id=request_id,
+                        success=False, message="Mamba pool not available"
                     )
 
                 # Resolve turn_number: if not provided, use latest
                 turn_number = recv_req.turn_number
                 if turn_number is None and recv_req.branch_name is None:
-                    latest = self.snapshot_manager.get_latest_snapshot(effective_conv_id)
+                    latest = self.snapshot_manager.get_latest_snapshot(
+                        effective_conv_id
+                    )
                     if latest is None:
                         return RestoreSnapshotReqOutput(
                             success=False,
                             message=f"No snapshots found for conversation={effective_conv_id}",
-                            request_id=request_id,
                         )
                     turn_number, _ = latest
 
                 # Load snapshot from disk (use rid as conversation_id fallback)
                 try:
                     snapshot = self.snapshot_manager.load_snapshot(
-                        effective_conv_id,
-                        turn_number,
-                        recv_req.branch_name
+                        effective_conv_id, turn_number, recv_req.branch_name
                     )
                 except (FileNotFoundError, ValueError):
                     snapshot = None
@@ -1387,7 +1398,6 @@ class Scheduler(
                             f"Snapshot not found: conversation={effective_conv_id}, "
                             f"turn={turn_number}, branch={recv_req.branch_name}"
                         ),
-                        request_id=request_id,
                     )
 
                 conv_states, temporal_states, metadata = snapshot
@@ -1396,13 +1406,11 @@ class Scheduler(
                 new_pool_idx = mamba_pool.alloc(1)
                 if new_pool_idx is None:
                     return RestoreSnapshotReqOutput(
-                        success=False,
-                        message="No free Mamba pool slots available",
-                        request_id=request_id,
+                        success=False, message="No free Mamba pool slots available"
                     )
 
                 # new_pool_idx is a (1,)-tensor; get a 0-dim tensor and a scalar
-                new_pool_idx_0d = new_pool_idx[0]       # 0-dim tensor — assign to req
+                new_pool_idx_0d = new_pool_idx[0]  # 0-dim tensor — assign to req
                 new_pool_idx_scalar = new_pool_idx_0d.item()  # Python int — for inject
                 pool_freed = False  # guard for outer except cleanup
 
@@ -1430,102 +1438,38 @@ class Scheduler(
                             "Snapshot is incompatible: fill_ids missing. "
                             "Re-run the original conversation to create a compatible snapshot."
                         ),
-                        request_id=request_id,
                     )
-                origin_input_ids = list(metadata.fill_ids)
-
-                # Stateful generation: append new tokens from the client.
-                # The client sends only the new question tokens; the server
-                # reconstructs Turn N context from the snapshot.
-                stateful_generate = recv_req.continuation_ids is not None
-                if stateful_generate:
-                    origin_input_ids = origin_input_ids + list(recv_req.continuation_ids)
-
-                # Check total input length against max_req_input_len
-                total_input_len = len(origin_input_ids)
-                if total_input_len >= self.max_req_input_len:
-                    # Input too long — fail fast to avoid Mamba state desynchronization
-                    mamba_pool.free(new_pool_idx_scalar)
-                    return RestoreSnapshotReqOutput(
-                        success=False,
-                        message=(
-                            f"Input length ({total_input_len}) meets or exceeds max_req_input_len ({self.max_req_input_len}). "
-                            "Cannot restore snapshot with continuation_ids that would exceed the limit. "
-                            "Reduce continuation_ids length or increase max_req_input_len."
-                        ),
-                        rid=new_rid,
-                        mamba_pool_idx=None,
-                        request_id=request_id,
-                    )
+                origin_input_ids = metadata.fill_ids
 
                 _sp = SamplingParams()
                 _sp.normalize(None)  # initialize stop_strs etc. (no tokenizer needed)
-                if recv_req.max_new_tokens is not None:
-                    _sp.max_new_tokens = recv_req.max_new_tokens
                 new_req = Req(
                     rid=new_rid,
                     origin_input_text="",  # We don't have original text
                     origin_input_ids=origin_input_ids,
                     sampling_params=_sp,
                     vocab_size=self.model_config.vocab_size,
-                    http_worker_ipc=recv_req.http_worker_ipc,  # Pass through for output routing
                 )
                 new_req.conversation_id = effective_conv_id
-                new_req.mamba_pool_idx = new_pool_idx_0d  # 0-dim tensor, required by free_mamba_cache
-                new_req.fill_ids = torch.tensor(origin_input_ids, dtype=torch.int64, device=self.device) if origin_input_ids else torch.tensor([], dtype=torch.int64, device=self.device)
-
-                # Mark for deferred output: generation completes before result is sent.
-                new_req._stateful_generate = stateful_generate
+                new_req.mamba_pool_idx = (
+                    new_pool_idx_0d  # 0-dim tensor, required by free_mamba_cache
+                )
+                new_req.fill_ids = (
+                    torch.tensor(
+                        origin_input_ids, dtype=torch.int64, device=self.device
+                    )
+                    if origin_input_ids
+                    else torch.tensor([], dtype=torch.int64, device=self.device)
+                )
 
                 # Register the new request in the waiting queue so it can be found by _find_request_by_rid
                 try:
                     self.init_req_max_new_tokens(new_req)
-
-                    # Check queue admission: _add_request_to_queue can silently refuse the request
-                    # (e.g., priority validation failure, queue full). In those cases, it sends an
-                    # AbortReq to the tokenizer but doesn't raise. Detect admission by checking if
-                    # the request's queue entry timestamp was set.
                     self._add_request_to_queue(new_req)
-
-                    # Detect if the request was actually admitted to the queue.
-                    # For NULL mode, check if wait_queue_entry_time was set (only set when added).
-                    # For PREFILL mode, check prefill_bootstrap_queue_entry_time.
-                    # For DECODE mode, check decode_prealloc_queue_entry_time.
-                    request_admitted = False
-                    if self.disaggregation_mode == DisaggregationMode.NULL:
-                        request_admitted = new_req.time_stats.wait_queue_entry_time is not None
-                    elif self.disaggregation_mode == DisaggregationMode.PREFILL:
-                        request_admitted = new_req.time_stats.prefill_bootstrap_queue_entry_time is not None
-                    elif self.disaggregation_mode == DisaggregationMode.DECODE:
-                        request_admitted = new_req.time_stats.decode_prealloc_queue_entry_time is not None
-
-                    if not request_admitted:
-                        # Request was not admitted (e.g., queue full, priority validation failed).
-                        # _add_request_to_queue already sent an AbortReq to the tokenizer.
-                        # Clean up the allocated mamba pool slot and return failure.
-                        logger.warning(
-                            f"Restore snapshot request not admitted to queue: conversation={recv_req.conversation_id}, "
-                            f"rid={new_rid}, stateful_generate={stateful_generate}"
-                        )
-                        mamba_pool.free(new_pool_idx)
-                        return RestoreSnapshotReqOutput(
-                            success=False,
-                            message=f"Request not admitted to queue (queue full or priority validation failed). rid={new_rid}",
-                            rid=new_rid,
-                            mamba_pool_idx=None,
-                            request_id=request_id,
-                        )
-
                     logger.info(
                         f"Created new request from snapshot: conversation={recv_req.conversation_id}, "
-                        f"turn={recv_req.turn_number}, rid={new_rid}, mamba_pool_idx={new_pool_idx_scalar}, "
-                        f"stateful_generate={stateful_generate}"
+                        f"turn={recv_req.turn_number}, rid={new_rid}, mamba_pool_idx={new_pool_idx_scalar}"
                     )
-
-                    if stateful_generate:
-                        # Output will be sent after generation completes via
-                        # stream_output_generation (see _stateful_generate flag).
-                        return None
 
                     return RestoreSnapshotReqOutput(
                         success=True,
@@ -1533,30 +1477,37 @@ class Scheduler(
                         token_count=metadata.token_count if metadata else None,
                         rid=new_rid,
                         mamba_pool_idx=new_pool_idx_scalar,
-                        request_id=request_id,
                     )
                 except Exception as reg_error:
                     # If registration fails, clean up the allocated mamba pool slot
-                    logger.error(f"Failed to register restored request: {reg_error}", exc_info=True)
+                    logger.error(
+                        f"Failed to register restored request: {reg_error}",
+                        exc_info=True,
+                    )
                     try:
                         mamba_pool.free(new_pool_idx)
                         pool_freed = True
                     except Exception as cleanup_error:
-                        logger.error(f"Failed to free mamba pool slot during cleanup: {cleanup_error}")
+                        logger.error(
+                            f"Failed to free mamba pool slot during cleanup: {cleanup_error}"
+                        )
                     raise
 
             except Exception as e:
-                logger.error(f"Failed to create new request from snapshot: {e}", exc_info=True)
+                logger.error(
+                    f"Failed to create new request from snapshot: {e}", exc_info=True
+                )
                 # If we allocated a mamba pool slot but failed before registering, try to free it
-                if 'new_pool_idx' in locals() and not pool_freed:
+                if "new_pool_idx" in locals() and not pool_freed:
                     try:
                         mamba_pool.free(new_pool_idx)
                     except Exception as cleanup_error:
-                        logger.error(f"Failed to free mamba pool slot during error cleanup: {cleanup_error}")
+                        logger.error(
+                            f"Failed to free mamba pool slot during error cleanup: {cleanup_error}"
+                        )
                 return RestoreSnapshotReqOutput(
                     success=False,
                     message=f"Error creating new request from snapshot: {str(e)}",
-                    request_id=request_id,
                 )
 
         try:
@@ -1566,21 +1517,17 @@ class Scheduler(
                 # Request has already completed — check if snapshot exists for this rid.
                 # If it does, the state is available for future requests; report success.
                 snapshot_exists = (
-                    (self.tier_manager is not None and
-                     self.tier_manager.host_pool.has_state(effective_conv_id))
-                    or bool(self.snapshot_manager.get_latest_snapshot(effective_conv_id))
-                )
+                    self.tier_manager is not None
+                    and self.tier_manager.host_pool.has_state(effective_conv_id)
+                ) or bool(self.snapshot_manager.get_latest_snapshot(effective_conv_id))
                 if snapshot_exists:
                     return RestoreSnapshotReqOutput(
                         success=True,
                         message=f"Snapshot state available for future requests (rid={recv_req.rid})",
                         token_count=None,
-                        request_id=request_id,
                     )
                 return RestoreSnapshotReqOutput(
-                    success=False,
-                    message=f"Request not found: {recv_req.rid}",
-                    request_id=request_id,
+                    success=False, message=f"Request not found: {recv_req.rid}"
                 )
 
             # Check that request is idle (not currently running)
@@ -1588,30 +1535,24 @@ class Scheduler(
                 return RestoreSnapshotReqOutput(
                     success=False,
                     message="Cannot restore snapshot while request is running. Wait until request is idle.",
-                    request_id=request_id,
                 )
 
             # Check if request has mamba pool index
-            if not hasattr(req, 'mamba_pool_idx') or req.mamba_pool_idx is None:
+            if not hasattr(req, "mamba_pool_idx") or req.mamba_pool_idx is None:
                 return RestoreSnapshotReqOutput(
-                    success=False,
-                    message="Request does not have Mamba state allocated",
-                    request_id=request_id,
+                    success=False, message="Request does not have Mamba state allocated"
                 )
 
             # Load snapshot (use rid as conversation_id fallback)
             snapshot = self.snapshot_manager.load_snapshot(
-                effective_conv_id,
-                recv_req.turn_number,
-                recv_req.branch_name
+                effective_conv_id, recv_req.turn_number, recv_req.branch_name
             )
 
             if snapshot is None:
                 return RestoreSnapshotReqOutput(
                     success=False,
                     message=f"Snapshot not found: conversation={effective_conv_id}, "
-                            f"turn={recv_req.turn_number}, branch={recv_req.branch_name}",
-                    request_id=request_id,
+                    f"turn={recv_req.turn_number}, branch={recv_req.branch_name}",
                 )
 
             conv_states, temporal_states, metadata = snapshot
@@ -1625,16 +1566,13 @@ class Scheduler(
                         "Snapshot is incompatible: fill_ids missing. "
                         "Re-run the original conversation to create a compatible snapshot."
                     ),
-                    request_id=request_id,
                 )
 
             # Get mamba_pool from req_to_token_pool
             mamba_pool = getattr(self.req_to_token_pool, "mamba_pool", None)
             if mamba_pool is None:
                 return RestoreSnapshotReqOutput(
-                    success=False,
-                    message="Mamba pool not available",
-                    request_id=request_id,
+                    success=False, message="Mamba pool not available"
                 )
 
             # Inject state back into pool
@@ -1643,7 +1581,9 @@ class Scheduler(
             )
 
             # Sync fill_ids from metadata to request
-            req.fill_ids = torch.tensor(metadata.fill_ids, dtype=torch.int64, device=self.device)
+            req.fill_ids = torch.tensor(
+                metadata.fill_ids, dtype=torch.int64, device=self.device
+            )
             req.origin_input_ids = metadata.fill_ids  # keep as list for downstream code
             logger.info(f"Synced fill_ids after restore, len={len(metadata.fill_ids)}")
 
@@ -1659,15 +1599,12 @@ class Scheduler(
                 token_count=metadata.token_count if metadata else None,
                 rid=recv_req.rid,
                 mamba_pool_idx=req.mamba_pool_idx,
-                request_id=request_id,
             )
 
         except Exception as e:
             logger.error(f"Failed to restore snapshot: {e}", exc_info=True)
             return RestoreSnapshotReqOutput(
-                success=False,
-                message=f"Error restoring snapshot: {str(e)}",
-                request_id=request_id,
+                success=False, message=f"Error restoring snapshot: {str(e)}"
             )
 
     def handle_delete_snapshot(self, recv_req):
@@ -1684,15 +1621,13 @@ class Scheduler(
         if self.snapshot_manager is None:
             return DeleteSnapshotReqOutput(
                 success=False,
-                message="Snapshot system not enabled. Start server with --enable-mamba-snapshots"
+                message="Snapshot system not enabled. Start server with --enable-mamba-snapshots",
             )
 
         try:
             # Delete the snapshot
             success = self.snapshot_manager.delete_snapshot(
-                recv_req.conversation_id,
-                recv_req.turn_number,
-                recv_req.branch_name
+                recv_req.conversation_id, recv_req.turn_number, recv_req.branch_name
             )
 
             if success:
@@ -1701,21 +1636,19 @@ class Scheduler(
                     f"turn={recv_req.turn_number}, branch={recv_req.branch_name}"
                 )
                 return DeleteSnapshotReqOutput(
-                    success=True,
-                    message="Snapshot deleted successfully"
+                    success=True, message="Snapshot deleted successfully"
                 )
             else:
                 return DeleteSnapshotReqOutput(
                     success=False,
                     message=f"Snapshot not found: conversation={recv_req.conversation_id}, "
-                            f"turn={recv_req.turn_number}, branch={recv_req.branch_name}"
+                    f"turn={recv_req.turn_number}, branch={recv_req.branch_name}",
                 )
 
         except Exception as e:
             logger.error(f"Failed to delete snapshot: {e}", exc_info=True)
             return DeleteSnapshotReqOutput(
-                success=False,
-                message=f"Error deleting snapshot: {str(e)}"
+                success=False, message=f"Error deleting snapshot: {str(e)}"
             )
 
     def handle_mamba_state_eviction(
@@ -1756,8 +1689,10 @@ class Scheduler(
 
         try:
             # Extract state from pool before it's evicted
-            conv_states, temporal_states = self.snapshot_manager.extract_state_from_pool(
-                mamba_pool, mamba_pool_idx
+            conv_states, temporal_states = (
+                self.snapshot_manager.extract_state_from_pool(
+                    mamba_pool, mamba_pool_idx
+                )
             )
 
             # Save to warm tier
@@ -1779,9 +1714,7 @@ class Scheduler(
                 )
 
         except Exception as e:
-            logger.error(
-                f"Error handling Mamba state eviction: {e}", exc_info=True
-            )
+            logger.error(f"Error handling Mamba state eviction: {e}", exc_info=True)
 
     def init_agent_system(self):
         """
@@ -1813,9 +1746,9 @@ class Scheduler(
         # Import agent modules (lazy import)
         try:
             from sglang.srt.agents import (
-                ToolRegistry,
                 ToolCallParser,
                 ToolExecutionEngine,
+                ToolRegistry,
             )
             from sglang.srt.agents.builtin_tools import register_builtin_tools
         except ImportError as e:
@@ -2394,14 +2327,6 @@ class Scheduler(
                 prepare_abort(req, error_msg, status_code=status_code)
                 self.stream_output([req], req.return_logprob)
 
-        if self.enable_trace:
-            for req in recv_reqs:
-                if isinstance(
-                    req, (TokenizedGenerateReqInput, TokenizedEmbeddingReqInput)
-                ):
-                    trace_set_proc_propagate_context(req.rid, req.trace_context)
-                    trace_slice_start("", req.rid, anonymous=True)
-
         return recv_reqs
 
     def _split_work_and_control_reqs(self, recv_reqs: List):
@@ -2599,6 +2524,7 @@ class Scheduler(
                 routing_key=recv_req.routing_key,
                 http_worker_ipc=recv_req.http_worker_ipc,
                 dllm_config=self.dllm_config,
+                time_stats=recv_req.time_stats,
             )
             req.tokenizer = self.tokenizer
 
@@ -2610,6 +2536,9 @@ class Scheduler(
                         f"bootstrap room id. {req.rid=}"
                     )
                     logger.error(error_msg)
+                    recv_req.time_stats.trace_ctx.abort(
+                        abort_info={"reason": error_msg}
+                    )
                     prepare_abort(req, error_msg, status_code=HTTPStatus.BAD_REQUEST)
                     self.stream_output([req], req.return_logprob)
                     return
@@ -2630,6 +2559,9 @@ class Scheduler(
             req = session.create_req(
                 recv_req, self.tokenizer, self.model_config.vocab_size
             )
+            # TODO: set trace context
+            if self.enable_metrics:
+                req.time_stats.set_metrics_collector(self.metrics_collector)
             if isinstance(req.finished_reason, FINISH_ABORT):
                 self.init_req_max_new_tokens(req)
                 self._add_request_to_queue(req)
@@ -2756,18 +2688,19 @@ class Scheduler(
                 return
             self._prefetch_kvcache(req)
             self.waiting_queue.append(req)
-            req.time_stats.wait_queue_entry_time = time.perf_counter()
-            trace_slice_end(RequestStage.REQUEST_PROCESS, req.rid, auto_next_anon=True)
+            req.time_stats.set_wait_queue_entry_time()
         elif self.disaggregation_mode == DisaggregationMode.PREFILL:
             self._prefetch_kvcache(req)
             self.disagg_prefill_bootstrap_queue.add(
                 req, self.model_config.num_key_value_heads
             )
-            req.time_stats.prefill_bootstrap_queue_entry_time = time.perf_counter()
+            req.time_stats.set_prefill_bootstrap_queue_entry_time()
         elif self.disaggregation_mode == DisaggregationMode.DECODE:
             self.disagg_decode_prealloc_queue.add(req, is_retracted=is_retracted)
             if not is_retracted:
-                req.time_stats.decode_prealloc_queue_entry_time = time.perf_counter()
+                req.time_stats.set_decode_prealloc_queue_entry_time()
+            else:
+                req.time_stats.set_retract_time()
         else:
             raise ValueError(f"Invalid {self.disaggregation_mode=}")
 
@@ -2791,25 +2724,10 @@ class Scheduler(
                 },
                 rid=req.rid,
             )
+            req.time_stats.trace_ctx.abort(abort_info=abort_req.finished_reason)
             self.send_to_tokenizer.send_output(abort_req, req)
             return False
         return True
-
-    def _cleanup_queued_request_resources(self, req: Req) -> None:
-        """Release resources held by a request that was already admitted to a queue."""
-        if self.disaggregation_mode == DisaggregationMode.DECODE:
-            release_kv_cache(req, self.tree_cache)
-
-        if self.disaggregation_mode == DisaggregationMode.PREFILL:
-            release_req_to_metadata_buffer(
-                req, self.req_to_metadata_buffer_idx_allocator
-            )
-
-        if (
-            req.mamba_pool_idx is not None
-            and self.disaggregation_mode != DisaggregationMode.DECODE
-        ):
-            release_kv_cache(req, self.tree_cache, is_insert=False)
 
     def _abort_on_queued_limit(self, recv_req: Req) -> bool:
         """Abort an incoming or existing request if the waiting queue is full. Returns True if the incoming request is aborted."""
@@ -2857,8 +2775,7 @@ class Scheduler(
             ),
             req_to_abort,
         )
-        if req_to_abort is not recv_req:
-            self._cleanup_queued_request_resources(req_to_abort)
+        req_to_abort.time_stats.trace_ctx.abort(abort_info={"reason": message})
         return req_to_abort.rid == recv_req.rid
 
     def _abort_on_waiting_timeout(self):
@@ -2884,7 +2801,6 @@ class Scheduler(
                     ),
                     req,
                 )
-                self._cleanup_queued_request_resources(req)
                 deleted_reqs.add(req)
 
         if deleted_reqs:
@@ -2906,6 +2822,7 @@ class Scheduler(
             dimensions=recv_req.dimensions,
             lora_id=recv_req.lora_id,
             http_worker_ipc=recv_req.http_worker_ipc,
+            time_stats=recv_req.time_stats,
         )
         req.tokenizer = self.tokenizer
 
@@ -3042,7 +2959,7 @@ class Scheduler(
         )
 
         if ret:
-            trace_event_batch("schedule", ret.reqs)
+            set_schedule_time_batch(ret)
 
         return ret
 
@@ -3216,11 +3133,6 @@ class Scheduler(
         if len(can_run_list) == 0:
             return None
 
-        if self.enable_metrics:
-            # only record queue time when enable_metrics is True to avoid overhead
-            for req in can_run_list:
-                req.add_latency(RequestStage.PREFILL_WAITING)
-
         self.waiting_queue = [
             x for x in self.waiting_queue if x not in set(can_run_list)
         ]
@@ -3241,14 +3153,7 @@ class Scheduler(
         self.can_run_list = can_run_list
         self.running_bs = len(self.running_batch.reqs)
 
-        # Record metrics
-        for req in can_run_list:
-            if req.time_stats.forward_entry_time == 0:
-                req.time_stats.forward_entry_time = time.perf_counter()
-                if self.enable_metrics:
-                    self.metrics_collector.observe_queue_time(
-                        req.time_stats.get_queueing_time(),
-                    )
+        set_time_batch(can_run_list, "set_forward_entry_time")
 
         # Create a new batch
         new_batch = ScheduleBatch.init_new(
@@ -3408,9 +3313,7 @@ class Scheduler(
 
         # Capture prefill start time for EXTEND mode
         if batch.forward_mode == ForwardMode.EXTEND:
-            current_time = time.perf_counter()
-            for req in batch.reqs:
-                req.time_stats.prefill_start_time_host = current_time
+            set_time_batch(batch.reqs, "set_prefill_run_batch_start_time")
 
         # Place holder handling for pd-disagg decode event loop
         if batch.forward_mode.is_prebuilt():
@@ -3527,9 +3430,7 @@ class Scheduler(
 
         # Capture prefill end time for EXTEND mode
         if batch.forward_mode == ForwardMode.EXTEND:
-            current_time = time.perf_counter()
-            for req in batch.reqs:
-                req.time_stats.prefill_end_time_host = current_time
+            set_time_batch(batch.reqs, "set_prefill_run_batch_end_time")
 
         if (
             self.server_args.enable_dp_attention
@@ -3568,7 +3469,6 @@ class Scheduler(
     ):
         if batch.forward_mode.is_decode():
             self.process_batch_result_decode(batch, result)
-            trace_slice_batch(RequestStage.DECODE_LOOP, batch.reqs)
         elif batch.forward_mode.is_extend():
             if batch.is_dllm():
                 self.process_batch_result_dllm(batch, result)
@@ -3604,16 +3504,10 @@ class Scheduler(
         if mamba_pool is None:
             return
 
-        # Trigger hooks for each request (prefill and non-decode paths).
-        # Finished decode requests are handled earlier in process_batch_result_decode,
-        # before free_mamba_cache clears mamba_pool_idx. Skip them here.
+        # Trigger hooks for each request
         for req in batch.reqs:
-            # Skip if request doesn't have mamba_pool_idx (already freed or N/A)
+            # Skip if request doesn't have mamba_pool_idx
             if not hasattr(req, "mamba_pool_idx") or req.mamba_pool_idx is None:
-                continue
-
-            # Finished decode reqs already snapshotted via the pre-free hook
-            if batch.forward_mode.is_decode() and req.finished():
                 continue
 
             # Calculate turn number (approximate based on output length)
@@ -4149,7 +4043,7 @@ class IdleSleeper:
 
     def __init__(self, sockets):
         self.poller = zmq.Poller()
-        self.last_empty_time = time.time()
+        self.last_empty_time = real_time()
         for s in sockets:
             self.poller.register(s, zmq.POLLIN)
 
@@ -4159,9 +4053,9 @@ class IdleSleeper:
         self.poller.poll(1000)
         if (
             self.empty_cache_interval > 0
-            and time.time() - self.last_empty_time > self.empty_cache_interval
+            and real_time() - self.last_empty_time > self.empty_cache_interval
         ):
-            self.last_empty_time = time.time()
+            self.last_empty_time = real_time()
             torch.cuda.empty_cache()
 
 

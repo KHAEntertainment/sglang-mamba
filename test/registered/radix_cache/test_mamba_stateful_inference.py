@@ -40,6 +40,7 @@ def _get_tokenizer():
     global _tokenizer
     if _tokenizer is None:
         from transformers import AutoTokenizer
+
         _tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
     return _tokenizer
 
@@ -179,7 +180,12 @@ class TestMambaStatefulInference(unittest.TestCase):
 
         # Turn 1: establish a fact via full chat
         t1 = self._chat(
-            [{"role": "user", "content": "The secret number is 42. Please confirm you understand."}],
+            [
+                {
+                    "role": "user",
+                    "content": "The secret number is 42. Please confirm you understand.",
+                }
+            ],
             rid=rid,
             max_tokens=60,
         )
@@ -283,7 +289,9 @@ class TestMambaStatefulInference(unittest.TestCase):
         # Turn 3: ask about both facts (stateful — no Turn 1 or 2 resent)
         # Restore uses rid1 → gets latest snapshot (Turn2 state) from COLD tier.
         r3 = self._stateful_generate(
-            rid1, "What is my favorite color and what is my lucky number?", max_new_tokens=100
+            rid1,
+            "What is my favorite color and what is my lucky number?",
+            max_new_tokens=100,
         )
         self.assertTrue(r3.get("success"), f"Turn3 stateful generate failed: {r3}")
         response = r3.get("output_text", "")
@@ -342,8 +350,10 @@ class TestMambaStatefulInference(unittest.TestCase):
         print("\n=== Token Savings ===")
         print(f"Full resend: {full_resend_tokens} tokens")
         print(f"Stateful:    {stateful_tokens} tokens")
-        print(f"Savings:     {full_resend_tokens - stateful_tokens} tokens "
-              f"({100 * (1 - stateful_tokens / full_resend_tokens):.1f}%)")
+        print(
+            f"Savings:     {full_resend_tokens - stateful_tokens} tokens "
+            f"({100 * (1 - stateful_tokens / full_resend_tokens):.1f}%)"
+        )
 
         self.assertGreater(
             full_resend_tokens,

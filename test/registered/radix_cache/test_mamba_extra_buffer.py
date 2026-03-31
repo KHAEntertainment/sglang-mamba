@@ -1,4 +1,4 @@
-from sglang.test.ci.ci_register import register_cuda_ci, register_amd_ci
+from sglang.test.ci.ci_register import register_amd_ci, register_cuda_ci
 
 register_cuda_ci(est_time=90, suite="stage-b-test-small-1-gpu")
 register_amd_ci(est_time=90, suite="stage-b-test-small-1-gpu-amd")
@@ -33,15 +33,24 @@ def _make_pool_extra_buffer(
     ]
     mamba_layers = [i for i in range(num_layers) if i not in full_attention_layer_ids]
     shape = Mamba2StateShape.create(
-        tp_world_size=1, intermediate_size=4096, n_groups=16, num_heads=32,
-        head_dim=128, state_size=128, conv_kernel=4,
+        tp_world_size=1,
+        intermediate_size=4096,
+        n_groups=16,
+        num_heads=32,
+        head_dim=128,
+        state_size=128,
+        conv_kernel=4,
     )
     with envs.SGLANG_MAMBA_SSM_DTYPE.override("bfloat16"):
         cache_params = Mamba2CacheParams(shape=shape, layers=mamba_layers)
     return HybridReqToTokenPool(
-        size=max_num_reqs, mamba_size=mamba_cache_size,
-        mamba_spec_state_size=max_num_reqs, max_context_len=max_context_len,
-        device=device, enable_memory_saver=False, cache_params=cache_params,
+        size=max_num_reqs,
+        mamba_size=mamba_cache_size,
+        mamba_spec_state_size=max_num_reqs,
+        max_context_len=max_context_len,
+        device=device,
+        enable_memory_saver=False,
+        cache_params=cache_params,
         enable_mamba_extra_buffer=True,
         speculative_num_draft_tokens=speculative_num_draft_tokens,
     )
@@ -49,7 +58,9 @@ def _make_pool_extra_buffer(
 
 def _make_req():
     return Req(
-        rid=0, origin_input_text="", origin_input_ids=[],
+        rid=0,
+        origin_input_text="",
+        origin_input_ids=[],
         sampling_params=SamplingParams(temperature=0, max_new_tokens=1),
     )
 
@@ -66,7 +77,7 @@ class TestMambaExtraBufferUnit(unittest.TestCase):
         self.pool.alloc([req])
         self.assertIsNotNone(
             getattr(req, "mamba_ping_pong_track_buffer", None),
-            "mamba_ping_pong_track_buffer should be allocated in extra_buffer mode"
+            "mamba_ping_pong_track_buffer should be allocated in extra_buffer mode",
         )
         buf = req.mamba_ping_pong_track_buffer
         self.assertGreaterEqual(len(buf), 1)
@@ -95,7 +106,9 @@ class TestMambaExtraBufferUnit(unittest.TestCase):
     def test_cache_unfinished_req_extra_buffer(self):
         """cache_unfinished_req clears mamba_last_track_seqlen and updates prefix_indices."""
         # Requires full MambaRadixCache setup — implement with cache fixture
-        self.skipTest("Requires full MambaRadixCache setup — implement with cache fixture")
+        self.skipTest(
+            "Requires full MambaRadixCache setup — implement with cache fixture"
+        )
 
 
 class TestMambaExtraBufferServer(unittest.TestCase):

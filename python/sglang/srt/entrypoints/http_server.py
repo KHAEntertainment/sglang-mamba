@@ -46,7 +46,7 @@ import orjson
 import requests
 import uvicorn
 import uvloop
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse, Response, StreamingResponse
@@ -98,12 +98,11 @@ from sglang.srt.managers.io_struct import (
     CloseSessionReqInput,
     ConfigureLoggingReq,
     ContinueGenerationReqInput,
+    DeleteSnapshotReqInput,
     DestroyWeightsUpdateGroupReqInput,
     EmbeddingReqInput,
     GenerateReqInput,
     GetSnapshotInfoReqInput,
-    RestoreSnapshotReqInput,
-    DeleteSnapshotReqInput,
     GetWeightsByNameReqInput,
     InitWeightsSendGroupForRemoteInstanceReqInput,
     InitWeightsUpdateGroupReqInput,
@@ -115,6 +114,7 @@ from sglang.srt.managers.io_struct import (
     PauseGenerationReqInput,
     ProfileReqInput,
     ReleaseMemoryOccupationReqInput,
+    RestoreSnapshotReqInput,
     ResumeMemoryOccupationReqInput,
     SaveSnapshotReqInput,
     SendWeightsToRemoteInstanceReqInput,
@@ -139,13 +139,17 @@ from sglang.srt.managers.multi_tokenizer_mixin import (
 )
 from sglang.srt.managers.template_manager import TemplateManager
 from sglang.srt.managers.tokenizer_manager import ServerStatus, TokenizerManager
-from sglang.srt.metrics.func_timer import enable_func_timer
 from sglang.srt.model_loader.remote_instance_weight_loader_utils import (
     parse_remote_instance_transfer_engine_info_from_scheduler_infos,
 )
+from sglang.srt.observability.func_timer import enable_func_timer
+from sglang.srt.observability.trace import (
+    process_tracing_init,
+    set_global_trace_level,
+    trace_set_thread_info,
+)
 from sglang.srt.parser.reasoning_parser import ReasoningParser
 from sglang.srt.server_args import PortArgs, ServerArgs
-from sglang.srt.tracing.trace import process_tracing_init, trace_set_thread_info
 from sglang.srt.utils import (
     add_prometheus_middleware,
     add_prometheus_track_response_middleware,
@@ -350,7 +354,9 @@ async def lifespan(fast_api_app: FastAPI):
             if hasattr(_global_state, "scheduler_proxy"):
                 register_agent_api_routes(app, _global_state.scheduler_proxy)
                 register_websocket_routes(app, _global_state.scheduler_proxy)
-                logger.info("Agent API routes (REST + WebSocket) registered successfully")
+                logger.info(
+                    "Agent API routes (REST + WebSocket) registered successfully"
+                )
             else:
                 logger.warning(
                     "Agent tools enabled but scheduler proxy not available. "
@@ -866,6 +872,16 @@ async def stop_profile_async():
     )
 
 
+@app.api_route("/set_trace_level", methods=["GET", "POST"])
+def set_trace_level(level: int = Query(..., ge=0)):
+    set_global_trace_level(level)
+
+    return Response(
+        content="success",
+        status_code=200,
+    )
+
+
 @app.api_route("/freeze_gc", methods=["GET", "POST"])
 @auth_level(AuthLevel.ADMIN_OPTIONAL)
 async def freeze_gc_async():
@@ -1211,7 +1227,9 @@ async def restore_snapshot(obj: RestoreSnapshotReqInput, request: Request):
     try:
         result = await _global_state.tokenizer_manager.restore_snapshot(obj)
         # Return appropriate status code based on result.success
-        status_code = HTTPStatus.OK if result.success else HTTPStatus.INTERNAL_SERVER_ERROR
+        status_code = (
+            HTTPStatus.OK if result.success else HTTPStatus.INTERNAL_SERVER_ERROR
+        )
         return ORJSONResponse(
             {
                 "success": result.success,
