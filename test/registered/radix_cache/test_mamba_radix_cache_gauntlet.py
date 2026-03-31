@@ -91,6 +91,7 @@ class TestMambaRadixCacheGauntlet(unittest.TestCase):
             device=self.device,
             enable_memory_saver=False,
             cache_params=self.mamba2_cache_params,
+            mamba_layer_ids=self.mamba_layers,
             enable_mamba_extra_buffer=False,
             speculative_num_draft_tokens=3,
         )
