@@ -93,6 +93,7 @@ if TYPE_CHECKING:
     from typing import Any, Dict
 
     from sglang.srt.configs.model_config import ModelConfig
+    from sglang.srt.managers.session_controller import Session
     from sglang.srt.observability.scheduler_metrics_mixin import PrefillStats
     from sglang.srt.speculative.eagle_info import EagleDraftInput
     from sglang.srt.speculative.spec_info import SpecInput, SpeculativeAlgorithm
@@ -362,6 +363,11 @@ class MultimodalInputs:
     mrope_positions: Optional[torch.Tensor] = None
     mrope_position_delta: Optional[torch.Tensor] = None
 
+    def release_features(self):
+        """Release feature tensors to free GPU memory."""
+        for item in self.mm_items:
+            item.feature = None
+
     @staticmethod
     def from_dict(obj: dict):
         # Check if MM splitting is enabled
@@ -499,7 +505,7 @@ class Req(ReqDllmMixin):
         lora_id: Optional[str] = None,
         input_embeds: Optional[List[List[float]]] = None,
         token_type_ids: List[int] = None,
-        session_id: Optional[str] = None,
+        session: Optional[Session] = None,
         custom_logit_processor: Optional[str] = None,
         require_reasoning: bool = False,
         return_hidden_states: bool = False,
@@ -534,7 +540,7 @@ class Req(ReqDllmMixin):
         self.output_ids = []
         # fill_ids = origin_input_ids + output_ids. Updated if chunked.
         self.fill_ids = []
-        self.session_id = session_id
+        self.session = session
         self.input_embeds = input_embeds
 
         # For req-level memory management
@@ -854,7 +860,11 @@ class Req(ReqDllmMixin):
         # Whether request reached finished condition
         return self.finished_reason is not None
 
-    def init_next_round_input(self, tree_cache: Optional[BasePrefixCache] = None):
+    def init_next_round_input(
+        self,
+        tree_cache: Optional[BasePrefixCache] = None,
+        cow_mamba: Optional[bool] = None,
+    ):
         if self.is_dllm():
             self._init_fill_ids_for_dllm()
             self.determine_dllm_phase()
@@ -870,11 +880,13 @@ class Req(ReqDllmMixin):
         token_ids = self.fill_ids[:max_prefix_len]
 
         if tree_cache is not None:
+            if cow_mamba is None:
+                cow_mamba = tree_cache.supports_mamba()
             match_result = tree_cache.match_prefix(
                 MatchPrefixParams(
                     key=RadixKey(token_ids=token_ids, extra_key=self.extra_key),
-                    req=self if tree_cache.supports_mamba() else None,
-                    cow_mamba=tree_cache.supports_mamba(),
+                    req=self,
+                    cow_mamba=cow_mamba,
                 )
             )
             (
@@ -1222,6 +1234,7 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
     global_num_tokens: Optional[List[int]] = None
     global_num_tokens_for_logprob: Optional[List[int]] = None
     is_extend_in_batch: bool = False
+    all_extend_in_batch: bool = False
     can_run_dp_cuda_graph: bool = False
     tbo_split_seq_index: Optional[int] = None
     global_forward_mode: Optional[ForwardMode] = None
@@ -1981,21 +1994,33 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
         self.seq_lens_sum += bs
 
         if get_global_server_args().enable_mamba_extra_buffer():
-            self.mamba_track_indices = torch.tensor(
-                [
-                    req.mamba_ping_pong_track_buffer[req.mamba_next_track_idx]
-                    for req in self.reqs
-                ],
-                dtype=torch.int64,
-                device=self.device,
-            )
-            self.mamba_track_mask = torch.tensor(
-                [
-                    sl % get_global_server_args().mamba_track_interval == 0
-                    for sl in self.seq_lens_cpu
-                ],
-                dtype=torch.bool,
-                device=self.device,
+            if len(self.reqs) == 0:
+                self.mamba_track_indices = torch.empty(
+                    (0,), dtype=torch.int64, device=self.device
+                )
+            else:
+                # already on device
+                all_buffers = torch.stack(
+                    [req.mamba_ping_pong_track_buffer for req in self.reqs]
+                )
+                idx = (
+                    torch.tensor(
+                        [req.mamba_next_track_idx for req in self.reqs],
+                        dtype=torch.int64,
+                        pin_memory=True,
+                    )
+                    .unsqueeze(1)
+                    .to(device=all_buffers.device, non_blocking=True)
+                )
+                self.mamba_track_indices = (
+                    torch.gather(all_buffers, 1, idx).squeeze(1).to(torch.int64)
+                )
+
+            # async H2D
+            self.mamba_track_mask = (
+                (self.seq_lens_cpu % get_global_server_args().mamba_track_interval == 0)
+                .pin_memory()
+                .to(device=self.device, non_blocking=True)
             )
 
     def maybe_wait_verify_done(self):
@@ -2166,6 +2191,7 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
             global_num_tokens=self.global_num_tokens,
             global_num_tokens_for_logprob=self.global_num_tokens_for_logprob,
             is_extend_in_batch=self.is_extend_in_batch,
+            all_extend_in_batch=self.all_extend_in_batch,
             can_run_dp_cuda_graph=self.can_run_dp_cuda_graph,
             tbo_split_seq_index=self.tbo_split_seq_index,
             global_forward_mode=self.global_forward_mode,
@@ -2223,6 +2249,7 @@ class ScheduleBatch(ScheduleBatchDisaggregationDecodeMixin):
             global_num_tokens=self.global_num_tokens,
             global_num_tokens_for_logprob=self.global_num_tokens_for_logprob,
             can_run_dp_cuda_graph=self.can_run_dp_cuda_graph,
+            all_extend_in_batch=self.all_extend_in_batch,
             is_extend_in_batch=self.is_extend_in_batch,
             is_prefill_only=self.is_prefill_only,
             seq_lens_cpu=self.seq_lens_cpu,
@@ -2327,6 +2354,7 @@ class ModelWorkerBatch:
     global_num_tokens: Optional[List[int]]
     global_num_tokens_for_logprob: Optional[List[int]]
     is_extend_in_batch: bool
+    all_extend_in_batch: bool
     can_run_dp_cuda_graph: bool
     tbo_split_seq_index: Optional[int]
     global_forward_mode: Optional[ForwardMode]

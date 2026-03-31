@@ -313,13 +313,15 @@ class ModelRunnerKVCacheMixin:
                 4096,
             )
 
+        additional_ratio = 0
+        if self.server_args.enable_mamba_extra_buffer():
+            # ping-pong buffer size is 2 when overlap schedule is on, 1 otherwise.
+            if not self.server_args.disable_overlap_schedule:
+                additional_ratio = MAMBA_CACHE_V2_ADDITIONAL_RATIO_OVERLAP
+            else:
+                additional_ratio = MAMBA_CACHE_V2_ADDITIONAL_RATIO_NO_OVERLAP
+
         if self.mambaish_config is not None:
-            additional_ratio = 0
-            if self.server_args.enable_mamba_extra_buffer():
-                if not self.spec_algorithm.is_none():
-                    additional_ratio = MAMBA_CACHE_V2_ADDITIONAL_RATIO_NO_OVERLAP
-                else:
-                    additional_ratio = MAMBA_CACHE_V2_ADDITIONAL_RATIO_OVERLAP
             if self.server_args.disable_radix_cache:
                 ratio = 1
             else:
@@ -406,6 +408,8 @@ class ModelRunnerKVCacheMixin:
                         speculative_num_draft_tokens=self.server_args.speculative_num_draft_tokens,
                         enable_mamba_extra_buffer=self.server_args.enable_mamba_extra_buffer(),
                         pre_alloc_size=pre_alloc_size,
+                        enable_overlap_schedule=not self.server_args.disable_overlap_schedule,
+                        mamba_size=self.server_args.max_mamba_cache_size,
                     )
                 else:
                     self.req_to_token_pool = DecodeReqToTokenPool(
@@ -428,6 +432,7 @@ class ModelRunnerKVCacheMixin:
                     cache_params=config.mamba2_cache_params,
                     enable_mamba_extra_buffer=self.server_args.enable_mamba_extra_buffer(),
                     speculative_num_draft_tokens=self.server_args.speculative_num_draft_tokens,
+                    enable_overlap_schedule=not self.server_args.disable_overlap_schedule,
                 )
             else:
                 self.req_to_token_pool = ReqToTokenPool(

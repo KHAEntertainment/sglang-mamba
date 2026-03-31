@@ -32,6 +32,9 @@ from sglang.srt.layers.attention.mamba.mamba2_metadata import (
     ForwardMetadata,
     Mamba2Metadata,
 )
+from sglang.srt.layers.attention.mamba.mamba_state_scatter_triton import (
+    fused_mamba_state_scatter_with_mask,
+)
 from sglang.srt.layers.radix_attention import RadixAttention
 from sglang.srt.layers.radix_linear_attention import RadixLinearAttention
 from sglang.srt.mem_cache.memory_pool import HybridReqToTokenPool, MambaPool
@@ -45,9 +48,12 @@ from sglang.srt.utils.common import rank0_log
 
 if not is_cpu() and not is_npu():
     # fix import error on CPU device, no impacts when non-CPU path
-    from sglang.jit_kernel.cutedsl_gdn import (
-        cutedsl_fused_sigmoid_gating_delta_rule_update,
-    )
+    try:
+        from sglang.jit_kernel.cutedsl_gdn import (
+            cutedsl_fused_sigmoid_gating_delta_rule_update,
+        )
+    except (ImportError, ModuleNotFoundError):
+        cutedsl_fused_sigmoid_gating_delta_rule_update = None
     from sglang.srt.layers.attention.fla.chunk import chunk_gated_delta_rule
     from sglang.srt.layers.attention.fla.chunk_delta_h import (
         CHUNK_SIZE as FLA_CHUNK_SIZE,
@@ -233,8 +239,13 @@ class MambaAttnBackendBase(AttentionBackend):
             query_start_loc = torch.arange(
                 0, bs + 1, dtype=torch.int32, device=self.device
             )
-        elif forward_batch.forward_mode.is_extend():
-            if forward_batch.forward_mode.is_target_verify():
+        elif forward_batch.forward_mode.is_extend(include_draft_extend_v2=True):
+            if forward_batch.forward_mode.is_draft_extend_v2():
+                # HybridLinearAttnBackend.init_forward_metadata calls all sub-backends
+                # unconditionally, but DRAFT_EXTEND_V2 only runs full-attn layers in
+                # the draft model, so mamba metadata can be skipped.
+                query_start_loc = None
+            elif forward_batch.forward_mode.is_target_verify():
                 query_start_loc = torch.arange(
                     0,
                     forward_batch.input_ids.shape[0] + 1,
@@ -1691,15 +1702,21 @@ class HybridLinearAttnBackend(AttentionBackend):
         mamba_steps_to_track: Optional[torch.Tensor],
         model,
     ):
+        """
+        Update mamba states after MTP verify using fully fused Triton kernel.
+
+        This replaces the original advanced indexing operations with a single fused
+        gather-scatter kernel that also handles masking internally, avoiding:
+        - index_elementwise_kernel from tensor[bool_mask]
+        - index_select kernel launches
+        - nonzero kernel launches
+        """
         request_number = accepted_steps.shape[0]
 
         state_indices_tensor = (
             self.linear_attn_backend.forward_metadata.mamba_cache_indices[
                 :request_number
             ]
-        )
-        intermediate_state_indices = torch.arange(
-            request_number, dtype=torch.int32, device=state_indices_tensor.device
         )
 
         mamba_caches = (
@@ -1711,41 +1728,34 @@ class HybridLinearAttnBackend(AttentionBackend):
         intermediate_state_cache = mamba_caches.intermediate_ssm
         intermediate_conv_window_cache = mamba_caches.intermediate_conv_window[0]
 
-        # Compute common indices once to avoid duplication
-        valid_mask = accepted_steps >= 0
-        dst_state_indices = state_indices_tensor[valid_mask].to(torch.int64)  # [N]
-        src_state_indices = intermediate_state_indices[valid_mask].to(
-            torch.int64
-        )  # [N]
-        last_steps = accepted_steps[valid_mask].to(torch.int64)  # [N]
-
-        # scatter into ssm_states at the chosen cache lines
-        ssm_states[:, dst_state_indices, :] = intermediate_state_cache[
-            :, src_state_indices, last_steps
-        ].to(ssm_states.dtype, copy=False)
-
-        # Scatter into conv_states at the chosen cache lines
-        conv_states[:, dst_state_indices, :] = intermediate_conv_window_cache[
-            :, src_state_indices, last_steps
-        ].to(conv_states.dtype, copy=False)
+        # Use fully fused kernel that handles masking internally
+        # This avoids separate nonzero() and index_select() calls
+        fused_mamba_state_scatter_with_mask(
+            ssm_states,
+            intermediate_state_cache,
+            state_indices_tensor,
+            accepted_steps,
+        )
+        fused_mamba_state_scatter_with_mask(
+            conv_states,
+            intermediate_conv_window_cache,
+            state_indices_tensor,
+            accepted_steps,
+        )
 
         # Track indices used for tracking mamba states for prefix cache
         if mamba_track_indices is not None:
             assert mamba_steps_to_track is not None
-            track_mask = mamba_steps_to_track >= 0
-            track_steps = mamba_steps_to_track[track_mask].to(torch.int64)  # [N]
-            if track_steps.numel() == 0:
-                # No track indices to update
-                return
-            dst_track_indices = mamba_track_indices[track_mask].to(torch.int64)
-            src_track_indices = intermediate_state_indices[track_mask].to(torch.int64)
-
-            # scatter into ssm_states at the chosen track states
-            ssm_states[:, dst_track_indices, :] = intermediate_state_cache[
-                :, src_track_indices, track_steps
-            ].to(ssm_states.dtype, copy=False)
-
-            # scatter into conv_states at the chosen track states
-            conv_states[:, dst_track_indices, :] = intermediate_conv_window_cache[
-                :, src_track_indices, track_steps
-            ].to(conv_states.dtype, copy=False)
+            # Use fully fused kernel for track scatter operations
+            fused_mamba_state_scatter_with_mask(
+                ssm_states,
+                intermediate_state_cache,
+                mamba_track_indices,
+                mamba_steps_to_track,
+            )
+            fused_mamba_state_scatter_with_mask(
+                conv_states,
+                intermediate_conv_window_cache,
+                mamba_track_indices,
+                mamba_steps_to_track,
+            )

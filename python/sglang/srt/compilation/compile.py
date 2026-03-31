@@ -11,7 +11,6 @@ from typing import Any, Callable, Optional, Union
 import torch
 
 from sglang.srt.compilation.compilation_config import CompilationConfig
-from sglang.srt.utils.common import rank0_log
 
 logger = logging.getLogger(__name__)
 
@@ -130,7 +129,6 @@ def install_torch_compiled(
     fullgraph: bool = True,
     graph_pool: Any = None,
 ):
-    rank0_log(f"install_torch_compiled")
     unbound_fwd = module.__class__.forward
     if not callable(unbound_fwd):
         raise TypeError("module.__class__.forward must be callable")

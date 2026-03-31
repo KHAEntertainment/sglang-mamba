@@ -337,10 +337,18 @@ class MambaPool:
 
         select_index = self.free_slots[:need_size]
         self.free_slots = self.free_slots[need_size:]
-        # clear at alloc time, fill allocated slots with zeros
+        # clear at alloc time — expand a scalar GPU zero to the right shape, no CPU-GPU sync
         for i in range(len(self.mamba_cache.conv)):
-            self.mamba_cache.conv[i][:, select_index] = 0
-        self.mamba_cache.temporal[:, select_index] = 0
+            t = self.mamba_cache.conv[i]
+            z = torch.zeros(1, dtype=t.dtype, device=t.device).expand(
+                t.shape[0], need_size, *t.shape[2:]
+            )
+            t[:, select_index] = z
+        t = self.mamba_cache.temporal
+        z = torch.zeros(1, dtype=t.dtype, device=t.device).expand(
+            t.shape[0], need_size, *t.shape[2:]
+        )
+        t[:, select_index] = z
 
         return select_index
 
@@ -443,6 +451,7 @@ class HybridReqToTokenPool(ReqToTokenPool):
         cache_params: BaseLinearStateParams,
         enable_mamba_extra_buffer: bool,
         speculative_num_draft_tokens: int = None,
+        enable_overlap_schedule: bool = True,
     ):
         super().__init__(
             size=size,
@@ -450,11 +459,18 @@ class HybridReqToTokenPool(ReqToTokenPool):
             device=device,
             enable_memory_saver=enable_memory_saver,
         )
-        self.mamba_ping_pong_track_buffer_size = (
-            2 if speculative_num_draft_tokens is None else 1
-        )
+        if envs.SGLANG_ENABLE_SPEC_V2.get() and not enable_mamba_extra_buffer:
+            raise ValueError(
+                "Spec v2 requires mamba scheduler strategy `extra_buffer` for mamba models. "
+                "Please set `--mamba-scheduler-strategy extra_buffer`."
+            )
+
+        self.mamba_ping_pong_track_buffer_size = 2 if enable_overlap_schedule else 1
         self.enable_mamba_extra_buffer = enable_mamba_extra_buffer
         self.enable_memory_saver = enable_memory_saver
+        # TODO: Support PP
+        self.start_layer = 0
+        self.layer_transfer_counter = None
         self._init_mamba_pool(
             size=mamba_size,
             mamba_spec_state_size=mamba_spec_state_size,
@@ -496,6 +512,11 @@ class HybridReqToTokenPool(ReqToTokenPool):
                 )
             )
 
+    def register_layer_transfer_counter(
+        self, layer_transfer_counter: "LayerDoneCounter"
+    ):
+        self.layer_transfer_counter = layer_transfer_counter
+
     # For chunk prefill req, we do not need to allocate mamba cache,
     # We could use allocated mamba cache instead.
     def alloc(self, reqs: List["Req"]) -> Optional[List[int]]:
@@ -503,8 +524,8 @@ class HybridReqToTokenPool(ReqToTokenPool):
         if select_index is None:
             return None
 
-        mamba_index = []
-        mamba_ping_pong_track_buffer_list = []
+        mamba_indices: list[torch.Tensor] = []
+        mamba_ping_pong_track_buffers: list[torch.Tensor] = []
         for req in reqs:
             mid = None
             if req.mamba_pool_idx is not None:  # for radix cache
@@ -516,7 +537,7 @@ class HybridReqToTokenPool(ReqToTokenPool):
                 ), f"Not enough space for mamba cache, try to increase --mamba-full-memory-ratio or --max-mamba-cache-size. {mid=}, {self.mamba_pool.size=}, {self.mamba_pool.available_size()=}, {len(reqs)=}"
                 mid = mid[0]
                 req.mamba_pool_idx = mid
-            mamba_index.append(mid)
+            mamba_indices.append(mid)
             if self.enable_mamba_extra_buffer:
                 if req.mamba_ping_pong_track_buffer is None:
                     req.mamba_ping_pong_track_buffer = self.mamba_pool.alloc(
@@ -526,26 +547,22 @@ class HybridReqToTokenPool(ReqToTokenPool):
                         req.mamba_ping_pong_track_buffer is not None
                     ), "Not enough space for mamba ping pong idx, try to increase --mamba-full-memory-ratio."
                     req.mamba_next_track_idx = 0
-                mamba_ping_pong_track_buffer_list.append(
-                    req.mamba_ping_pong_track_buffer.tolist()
-                )
+                mamba_ping_pong_track_buffers.append(req.mamba_ping_pong_track_buffer)
         assert len(select_index) == len(
-            mamba_index
+            mamba_indices
         ), f"Not enough space for mamba cache, try to increase --mamba-full-memory-ratio or --max-mamba-cache-size."
         if self.enable_mamba_extra_buffer:
             assert len(select_index) == len(
-                mamba_ping_pong_track_buffer_list
+                mamba_ping_pong_track_buffers
             ), f"Not enough space for mamba ping pong idx, try to increase --mamba-full-memory-ratio."
-        self.req_index_to_mamba_index_mapping[select_index] = torch.tensor(
-            mamba_index, dtype=torch.int32, device=self.device
-        )
+        mamba_index_tensor = torch.stack(mamba_indices).to(dtype=torch.int32)
+        self.req_index_to_mamba_index_mapping[select_index] = mamba_index_tensor
         if self.enable_mamba_extra_buffer:
+            ping_pong_tensor = torch.stack(mamba_ping_pong_track_buffers).to(
+                dtype=torch.int32
+            )
             self.req_index_to_mamba_ping_pong_track_buffer_mapping[select_index] = (
-                torch.tensor(
-                    mamba_ping_pong_track_buffer_list,
-                    dtype=torch.int32,
-                    device=self.device,
-                )
+                ping_pong_tensor
             )
         return select_index
 
@@ -554,6 +571,8 @@ class HybridReqToTokenPool(ReqToTokenPool):
 
     def mamba2_layer_cache(self, layer_id: int):
         assert layer_id in self.mamba_map
+        if self.layer_transfer_counter is not None:
+            self.layer_transfer_counter.wait_until(layer_id - self.start_layer)
         return self.mamba_pool.mamba2_layer_cache(self.mamba_map[layer_id])
 
     def get_speculative_mamba2_params_all_layers(self) -> MambaPool.SpeculativeState:
@@ -582,11 +601,28 @@ class HybridReqToTokenPool(ReqToTokenPool):
                     0,
                     1,
                 ], f"mamba_ping_pong_track_buffer_to_keep must be 0 or 1, {mamba_ping_pong_track_buffer_to_keep=}"
-                idx_to_free = list(range(self.mamba_ping_pong_track_buffer_size))
-                idx_to_free.remove(mamba_ping_pong_track_buffer_to_keep)
-                mamba_ping_pong_track_buffer_to_free = (
-                    mamba_ping_pong_track_buffer_to_free[idx_to_free]
-                )
+                # Avoid Python-list advanced indexing on a device tensor.
+                # The ping-pong buffer size is either 2 (normal) or 1 (spec decode).
+                if self.mamba_ping_pong_track_buffer_size == 2:
+                    idx_to_free = 1 - mamba_ping_pong_track_buffer_to_keep
+                    mamba_ping_pong_track_buffer_to_free = (
+                        mamba_ping_pong_track_buffer_to_free[
+                            idx_to_free : idx_to_free + 1
+                        ]
+                    )
+                else:
+                    assert self.mamba_ping_pong_track_buffer_size == 1, (
+                        f"Unexpected mamba_ping_pong_track_buffer_size="
+                        f"{self.mamba_ping_pong_track_buffer_size}"
+                    )
+                    assert mamba_ping_pong_track_buffer_to_keep == 0, (
+                        "mamba_ping_pong_track_buffer_to_keep must be 0 when "
+                        "mamba_ping_pong_track_buffer_size is 1"
+                    )
+                    # Keep the only slot, so free nothing.
+                    mamba_ping_pong_track_buffer_to_free = (
+                        mamba_ping_pong_track_buffer_to_free[0:0]
+                    )
             self.mamba_pool.free(mamba_ping_pong_track_buffer_to_free)
 
     def clear(self):
@@ -1205,8 +1241,8 @@ class HybridLinearKVPool(KVCache):
         self.device = device
         self.full_layer_nums = len(full_attention_layer_ids)
         self.page_size = page_size
-        # TODO support pp?
-        self.start_layer = 0
+        self.start_layer = 0  # TODO: Support PP
+        self.layer_transfer_counter = None
         self.head_num = head_num
         self.head_dim = head_dim
         self.mamba_pool = mamba_pool
@@ -1290,15 +1326,30 @@ class HybridLinearKVPool(KVCache):
             )
         return self.full_attention_layer_id_mapping[layer_id]
 
+    def register_layer_transfer_counter(
+        self, layer_transfer_counter: "LayerDoneCounter"
+    ):
+        self.layer_transfer_counter = layer_transfer_counter
+        # The layer-wise wait logic is executed at the Hybrid LinearPool level;
+        # no additional wait is needed in the full_kv_pool
+        self.full_kv_pool.register_layer_transfer_counter(None)
+
+    def _wait_for_layer(self, layer_id: int):
+        if self.layer_transfer_counter is not None:
+            self.layer_transfer_counter.wait_until(layer_id - self.start_layer)
+
     def get_key_buffer(self, layer_id: int):
+        self._wait_for_layer(layer_id)
         layer_id = self._transfer_full_attention_id(layer_id)
         return self.full_kv_pool.get_key_buffer(layer_id)
 
     def get_value_buffer(self, layer_id: int):
+        self._wait_for_layer(layer_id)
         layer_id = self._transfer_full_attention_id(layer_id)
         return self.full_kv_pool.get_value_buffer(layer_id)
 
     def get_kv_buffer(self, layer_id: int):
+        self._wait_for_layer(layer_id)
         layer_id = self._transfer_full_attention_id(layer_id)
         return self.full_kv_pool.get_kv_buffer(layer_id)
 
