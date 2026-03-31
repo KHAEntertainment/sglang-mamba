@@ -14,11 +14,7 @@ from sglang.srt.managers.io_struct import (
     BatchEmbeddingOutput,
     BatchTokenIDOutput,
 )
-from sglang.srt.managers.schedule_batch import (
-    BaseFinishReason,
-    Req,
-    ScheduleBatch,
-)
+from sglang.srt.managers.schedule_batch import BaseFinishReason, Req, ScheduleBatch
 from sglang.srt.mem_cache.common import release_kv_cache
 from sglang.srt.server_args import get_global_server_args
 
@@ -962,8 +958,12 @@ class SchedulerOutputProcessorMixin:
                         # Check if finish_reason indicates failure (abort, error, etc.)
                         # BaseFinishReason has a 'type' field: 'abort', 'length', 'matched_token', 'matched_str', 'matched_regex'
                         from sglang.srt.managers.schedule_batch import BaseFinishReason
+
                         if isinstance(finish_reason, BaseFinishReason):
-                            if hasattr(finish_reason, "type") and finish_reason.type == "abort":
+                            if (
+                                hasattr(finish_reason, "type")
+                                and finish_reason.type == "abort"
+                            ):
                                 success = False
 
                     # Use output_ids_through_stop to match the normal /generate path behavior

@@ -1,4 +1,4 @@
-from sglang.test.ci.ci_register import register_cuda_ci, register_amd_ci
+from sglang.test.ci.ci_register import register_amd_ci, register_cuda_ci
 
 # Stress tests: longer timeout, same suite (or consider a nightly suite)
 register_cuda_ci(est_time=300, suite="nightly-1-gpu", nightly=True)
@@ -42,7 +42,9 @@ class TestMambaGauntletStress(unittest.TestCase):
         kwargs.setdefault("temperature", 0)
         kwargs.setdefault("max_tokens", 30)
         payload = {"model": "default", "messages": messages, **kwargs}
-        r = requests.post(f"{SERVER_URL}/v1/chat/completions", json=payload, timeout=120)
+        r = requests.post(
+            f"{SERVER_URL}/v1/chat/completions", json=payload, timeout=120
+        )
         r.raise_for_status()
         return r.json()
 
@@ -70,9 +72,15 @@ class TestMambaGauntletStress(unittest.TestCase):
         errors = []
         for i in range(100):
             try:
-                resp = self._chat([
-                    {"role": "user", "content": f"Unique-{uuid.uuid4().hex}: say ok{i}"},
-                ], max_tokens=5)
+                resp = self._chat(
+                    [
+                        {
+                            "role": "user",
+                            "content": f"Unique-{uuid.uuid4().hex}: say ok{i}",
+                        },
+                    ],
+                    max_tokens=5,
+                )
                 self.assertIn(resp["choices"][0]["finish_reason"], ("stop", "length"))
             except Exception as e:
                 errors.append(str(e))
@@ -95,8 +103,9 @@ class TestMambaGauntletStress(unittest.TestCase):
         # state corruption or nondeterminism that constitutes a test failure.
         unique = set(outputs)
         self.assertEqual(
-            len(unique), 1,
-            f"Outputs diverged across runs — expected all 50 identical at temperature=0: {unique}"
+            len(unique),
+            1,
+            f"Outputs diverged across runs — expected all 50 identical at temperature=0: {unique}",
         )
 
     def test_alternating_long_and_short_requests(self):
@@ -116,7 +125,9 @@ class TestMambaGauntletStress(unittest.TestCase):
     def test_zz_server_health_after_stress(self):
         """After all stress tests run, server is still responsive and returns 200 on /health."""
         r = requests.get(f"{SERVER_URL}/health", timeout=10)
-        self.assertEqual(r.status_code, 200, "Server became unhealthy after stress tests")
+        self.assertEqual(
+            r.status_code, 200, "Server became unhealthy after stress tests"
+        )
 
     def test_concurrent_multi_turn_conversations(self):
         """8 concurrent 5-turn conversations, each with a unique persona, all stay coherent."""
@@ -124,9 +135,19 @@ class TestMambaGauntletStress(unittest.TestCase):
 
         def run_conversation(persona):
             history = []
-            history.append({"role": "user", "content": f"My name is {persona}. Reply with JSON: {{\"name\":\"{persona}\"}}"})
+            history.append(
+                {
+                    "role": "user",
+                    "content": f'My name is {persona}. Reply with JSON: {{"name":"{persona}"}}',
+                }
+            )
             resp = self._chat(history, max_tokens=60)
-            history.append({"role": "assistant", "content": resp["choices"][0]["message"]["content"]})
+            history.append(
+                {
+                    "role": "assistant",
+                    "content": resp["choices"][0]["message"]["content"],
+                }
+            )
             try:
                 parsed = json.loads(
                     strip_markdown_json(resp["choices"][0]["message"]["content"])
@@ -137,7 +158,12 @@ class TestMambaGauntletStress(unittest.TestCase):
                 return f"FAIL: {persona} name mismatch: {parsed.get('name')}"
 
             for turn in range(4):
-                history.append({"role": "user", "content": f"Turn {turn+2}: what is my name? Reply with JSON: {{\"name\":\"{persona}\"}}"})
+                history.append(
+                    {
+                        "role": "user",
+                        "content": f'Turn {turn+2}: what is my name? Reply with JSON: {{"name":"{persona}"}}',
+                    }
+                )
                 resp = self._chat(history, max_tokens=60)
                 content = resp["choices"][0]["message"]["content"]
                 history.append({"role": "assistant", "content": content})

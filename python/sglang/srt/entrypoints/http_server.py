@@ -46,13 +46,7 @@ import orjson
 import requests
 import uvicorn
 import uvloop
-from fastapi import (
-    Depends,
-    FastAPI,
-    HTTPException,
-    Query,
-    Request,
-)
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse, Response, StreamingResponse
@@ -104,12 +98,11 @@ from sglang.srt.managers.io_struct import (
     CloseSessionReqInput,
     ConfigureLoggingReq,
     ContinueGenerationReqInput,
+    DeleteSnapshotReqInput,
     DestroyWeightsUpdateGroupReqInput,
     EmbeddingReqInput,
     GenerateReqInput,
     GetSnapshotInfoReqInput,
-    RestoreSnapshotReqInput,
-    DeleteSnapshotReqInput,
     GetWeightsByNameReqInput,
     InitWeightsSendGroupForRemoteInstanceReqInput,
     InitWeightsUpdateGroupReqInput,
@@ -121,6 +114,7 @@ from sglang.srt.managers.io_struct import (
     PauseGenerationReqInput,
     ProfileReqInput,
     ReleaseMemoryOccupationReqInput,
+    RestoreSnapshotReqInput,
     ResumeMemoryOccupationReqInput,
     SaveSnapshotReqInput,
     SendWeightsToRemoteInstanceReqInput,
@@ -360,7 +354,9 @@ async def lifespan(fast_api_app: FastAPI):
             if hasattr(_global_state, "scheduler_proxy"):
                 register_agent_api_routes(app, _global_state.scheduler_proxy)
                 register_websocket_routes(app, _global_state.scheduler_proxy)
-                logger.info("Agent API routes (REST + WebSocket) registered successfully")
+                logger.info(
+                    "Agent API routes (REST + WebSocket) registered successfully"
+                )
             else:
                 logger.warning(
                     "Agent tools enabled but scheduler proxy not available. "
@@ -1231,7 +1227,9 @@ async def restore_snapshot(obj: RestoreSnapshotReqInput, request: Request):
     try:
         result = await _global_state.tokenizer_manager.restore_snapshot(obj)
         # Return appropriate status code based on result.success
-        status_code = HTTPStatus.OK if result.success else HTTPStatus.INTERNAL_SERVER_ERROR
+        status_code = (
+            HTTPStatus.OK if result.success else HTTPStatus.INTERNAL_SERVER_ERROR
+        )
         return ORJSONResponse(
             {
                 "success": result.success,
