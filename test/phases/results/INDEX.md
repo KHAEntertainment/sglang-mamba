@@ -24,6 +24,7 @@ All results for the SGLang-Mamba snapshot persistence testing program. Each phas
 | 10d | Scaling: pure Mamba2 compat | **INCOMPATIBLE** | Mamba-Codestral-7B | 2026-03-30 |
 | 10e | Context scaling: 2K-128K | **PASS** (5/5 tiers) | granite-4.0-h-tiny | 2026-03-30 |
 | 10f | Resilience testing | **PASS** (4/5) | granite-4.0-h-tiny | 2026-03-30 |
+| compat | Granite 4.0-H-small (base model) | **PASS** (0 model-specific failures) | GraniteMoeHybridForCausalLM | 2026-04-01 |
 | compat | Nemotron-3-Super-120B-A12B FP8 | **PASS** (54/56, 96.4%) | NemotronHForCausalLM | 2026-04-01 |
 | compat | Qwen3-Coder-Next FP8 (ad-hoc) | **PASS** (56/59) | Qwen3NextForCausalLM | 2026-04-01 |
 | compat | Qwen3-Coder-Next FP8 (protocol) | **PASS** (62/62, 100%) | Qwen3NextForCausalLM | 2026-04-01 |
@@ -159,6 +160,11 @@ Five adverse-condition tests: (1) client disconnect mid-stream — server recove
 | Snapshot size at max ctx | ~55MB | N/A | N/A |
 | WARM restore at 128K | **2ms** | N/A | N/A |
 | Save latency at 128K | **193ms** | N/A | N/A |
+
+#### Granite 4.0-H-small (base model)
+**Result**: PASS (0 model-specific failures) | **File**: `compat-granite-4.0-h-small-20260401.md`
+
+32B BF16 dense hybrid (36 Mamba2 + 4 Attention). **Base model — no chat template**: all `/v1/chat/completions` tests return HTTP 400; 14 failures are test harness assumption failures, not infrastructure bugs. 2 pre-existing restore API failures (all models). Zero model-specific infrastructure failures. Custom gauntlet 142/142 PASS via `/generate`. Snapshot: 145.7MB, WARM tier instant save. VRAM: 130.3 GB / 143.8 GB H200. Key finding: base models need protocol adaptation to use `/generate` instead of `/v1/chat/completions`.
 
 ### H200 Model Compat Runs (2026-04-01)
 
