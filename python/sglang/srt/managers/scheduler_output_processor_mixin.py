@@ -406,7 +406,6 @@ class SchedulerOutputProcessorMixin:
                 can_run_cuda_graph=can_run_cuda_graph,
             )
 
-
     def process_batch_result_decode(
         self: Scheduler,
         batch: ScheduleBatch,
@@ -1058,7 +1057,6 @@ class SchedulerOutputProcessorMixin:
             # Multimodal partial stream chunks break the detokenizer, so drop aborted requests here.
             if self.model_config.is_multimodal_gen and req.to_finish:
                 continue
-
 
             if req.finished():
                 if req.finished_output:

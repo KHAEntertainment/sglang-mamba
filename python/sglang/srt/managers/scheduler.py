@@ -24,7 +24,7 @@ from collections import deque
 from contextlib import nullcontext
 from dataclasses import dataclass
 from http import HTTPStatus
-from typing import Any, Deque, List, Optional, Tuple, Union
+from typing import Any, Deque, Dict, List, Optional, Tuple, Union
 
 from sglang.srt.utils.common import suppress_noisy_warnings
 
@@ -218,7 +218,6 @@ from sglang.srt.utils import (
     get_available_gpu_memory,
     get_bool_env_var,
     get_int_env_var,
-    get_numa_node,
     is_mps,
     kill_itself_when_parent_died,
     point_to_point_pyobj,

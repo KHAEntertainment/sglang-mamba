@@ -35,7 +35,6 @@ from sglang.srt.parser.reasoning_parser import ReasoningParser
 from sglang.srt.utils.common import (
     LORA_TARGET_ALL_MODULES,
     SUPPORTED_LORA_TARGET_MODULES,
-    check_pkg_version_at_least,
     cpu_has_amx_support,
     get_bool_env_var,
     get_device,
@@ -69,9 +68,7 @@ from sglang.srt.utils.common import (
 from sglang.srt.utils.hf_transformers_utils import check_gguf_file
 from sglang.srt.utils.network import (
     NetworkAddress,
-    configure_ipv6,
     get_free_port,
-    is_port_available,
     is_valid_ipv6_address,
     wait_port_available,
 )

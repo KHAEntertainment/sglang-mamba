@@ -91,6 +91,7 @@ class TestMambaRadixCacheGauntlet(unittest.TestCase):
             device=self.device,
             enable_memory_saver=False,
             cache_params=self.mamba2_cache_params,
+            mamba_layer_ids=self.mamba_layers,
             enable_mamba_extra_buffer=False,
             speculative_num_draft_tokens=3,
         )
@@ -224,9 +225,9 @@ class TestMambaRadixCacheGauntlet(unittest.TestCase):
         token_ids_C = list(range(85))
 
         # Fake KV tensors: internal-node eviction never frees KV, so zeros are safe.
-        kv_A = torch.zeros(65, dtype=torch.int64)
-        kv_B = torch.zeros(75, dtype=torch.int64)
-        kv_C = torch.zeros(85, dtype=torch.int64)
+        kv_A = torch.zeros(65, dtype=torch.int64, device=self.device)
+        kv_B = torch.zeros(75, dtype=torch.int64, device=self.device)
+        kv_C = torch.zeros(85, dtype=torch.int64, device=self.device)
 
         req_a = self._make_dummy_req()
         self.cache.insert(
