@@ -1,61 +1,55 @@
-# Phase 10 Cross-Model Results: Nemotron-Cascade-2-30B
+# Phase 10 Results: Nemotron-Cascade-2-30B-A3B
 
-**Date:** 2026-03-29
-**Machine:** RunPod A100-SXM4-80GB (80 GB VRAM)
-**Model:** Nemotron-Cascade-2-30B (BF16)
-**Architecture:** `NemotronHForCausalLM` — MoE Mamba2 hybrid
+## Model Info
+- **Architecture**: NemotronHForCausalLM (native SGLang support)
+- **Parameters**: 30B total / 3B active (MoE)
+- **Layers**: 52 (hybrid Mamba+MoE+Attention)
+- **Hybrid pattern**: MEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEM*EMEMEMEM*EMEMEMEME
+  - M = Mamba layers
+  - E = MoE Expert layers (128 experts, 6 active)
+  - * = Attention layers
+- **Context**: 262144 (limited to 2048 for testing)
+- **GPU Memory**: ~70GB VRAM on A100 80GB
 
-> **Note:** Reconstructed from memory system. Original file was on the RunPod A100 instance and was not committed before instance termination.
+## Test Results
 
----
+| Test | Status | Details |
+|------|--------|---------|
+| Basic Inference | PASS | "4." for 2+2, 0.109s |
+| Multi-turn (5 turns) | PASS | All 5 snapshots saved successfully |
+| Rapid Fire (50) | PASS | 50/50, avg 0.059s, 0 GPU/RSS delta |
+| Medium Context (711 tokens) | PASS | Snapshot saved |
+| Snapshot Directory | PASS | 6 safetensors, 280.9MB |
 
-## Protocol
+## Resource Summary
+| Metric | Start | End | Delta |
+|--------|-------|-----|-------|
+| GPU VRAM | 70,074 MB | 70,206 MB | +132 MB |
+| Process RSS | 4,948 MB | 5,271 MB | +323 MB |
+| Snapshot Storage | 0 MB | 280.9 MB | +280.9 MB |
 
-Phase 10 cross-model compatibility test (5 tests):
-1. Baseline inference — single-turn completion
-2. Snapshot save — verify state is captured
-3. Snapshot restore — verify state loads
-4. Memory leak detection — VRAM/RAM stable across runs
-5. Rapid-fire throughput — concurrent requests
+## Memory Leak Assessment
+- **GPU**: No leak. +132MB across ~60 requests, stable during rapid fire.
+- **RSS**: +323MB growth during multi-turn and context tests. Acceptable.
+- **Rapid fire**: 0 GPU delta, 0 RSS delta. No incremental leak.
 
----
+## Performance Comparison with granite-4.0-h-small
 
-## Results
+| Metric | granite-4.0-h-small | Nemotron-30B | Winner |
+|--------|---------------------|--------------|--------|
+| Basic latency | 0.186s | 0.109s | Nemotron |
+| Rapid fire avg | 0.172s | 0.059s | Nemotron (3x) |
+| Snapshot save rate | 1/20 (5%) | 5/5 (100%) | Nemotron |
+| GPU stability | +256MB | +132MB | Nemotron |
+| RSS stability | +21MB | +323MB | Granite |
+| Snapshot size | ~150MB each | ~47MB each | Nemotron (3x smaller) |
+| Test score | 4/5 | 5/5 | Nemotron |
 
-| Test | Result | Notes |
-|------|--------|-------|
-| Baseline inference | PASS | Coherent completions, fast inference |
-| Snapshot save | PASS | Snapshot written to WARM tier, ~47 MB |
-| Snapshot restore | PASS | State loads successfully, rid=null (pre-existing gap) |
-| Memory leak detection | PASS | VRAM stable, no RAM growth |
-| Rapid-fire throughput | PASS | Sustained concurrent load without degradation |
+## Key Findings
 
-**5/5 PASS (100%)**
-
----
-
-## Key Metrics
-
-| Metric | Value |
-|--------|-------|
-| Snapshot size | **~47 MB** per conversation turn |
-| Average inference latency | **0.059s** |
-| vs. granite-small (32B) | **3× faster** (0.059s vs. 0.172s) |
-| Snapshot save rate | **100%** |
-| Stateful recall | BLOCKED (pre-existing restore API gap) |
-
----
-
-## Notes
-
-- Star performer in Phase 10: fastest inference of any model tested, smallest snapshots despite being a 30B model
-- MoE routing (3B active parameters) explains the inference speed advantage
-- FP8 not used in this run — BF16 weights
-- Snapshot size (~47 MB) is notably smaller than granite-small (~150 MB) despite having more total parameters — reflects smaller active parameter count
-- Loaded without special flags on A100 80GB
-
----
-
-## Verdict
-
-**COMPATIBLE** with Engram snapshot infrastructure. Recommended as the primary benchmark model for future Phase 10 runs due to speed and consistent behavior.
+1. **Nemotron outperforms Granite** in latency, snapshot reliability, and GPU stability
+2. **MoE architecture** gives 3x faster inference (only 6/128 experts active)
+3. **Snapshot saves 100% reliable** vs 5% for Granite — WARM tier retention better
+4. **Per-snapshot size smaller**: ~47MB vs ~150MB (fewer total mamba layers in MoE config)
+5. **No memory leaks detected** in either model
+6. **Snapshot restore (stateful gen)** still hangs — same architectural bug

@@ -1,69 +1,90 @@
-# Phase 10 Cross-Model Results: Granite 4.0-H-small (32B)
+# Phase 10 Results: granite-4.0-h-small
 
-**Date:** 2026-03-29/30
-**Machine:** RunPod A100-SXM4-80GB (80 GB VRAM)
-**Model:** Granite 4.0-H-small (32B, BF16)
-**Architecture:** `GraniteMoeHybridForCausalLM` — dense Mamba2 hybrid (36 Mamba layers)
+## Model Info
+- **Architecture**: GraniteMoeHybridForCausalLM
+- **Parameters**: 32B dense hybrid (40 layers: 36 mamba + 4 attention)
+- **MoE**: 72 experts, 10 active per token
+- **Context**: 131072 (limited to 4096 for testing)
+- **GPU Memory**: ~70GB VRAM, 80GB A100
+- **Disk**: 61GB model weights
 
-> **Note:** Reconstructed from memory system. Original file was on the RunPod A100 instance and was not committed before instance termination. One raw metric file preserved: `phase-10-logs/metrics_small_20260330_024240.csv`.
+## Test Results
 
----
+### Test 1: Basic Inference
+- **Status**: PASS
+- Response: "4." for 2+2
+- Latency: 0.186s
 
-## Launch Configuration
+### Test 2: Multi-turn (10 turns)
+- **Status**: PASS
+- All turns completed successfully
+- Model remembered "Alice" across turns
+- Latency range: 0.247s - 3.314s (increases with context)
 
-Required special flags to fit on A100 80GB:
-```bash
---context-length 4096 --mem-fraction-static 0.85
-```
-Default context (128K) would OOM. Reduced to 4K to free sufficient VRAM for the model.
+### Test 3: Snapshot Save
+- **Status**: PASS
+- Save from WARM tier: 0.153s
+- Snapshot ID format: {conversation_id}-t0
 
----
+### Test 3b: Snapshot Restore (stateful generation)
+- **Status**: FAIL (timeout)
+- Root cause: Deferred output path returns None, HTTP future never resolved
+- Architectural issue, not model-specific
 
-## Protocol
+### Test 3d: Multiple Snapshot Saves
+- **Status**: PASS
+- 5/5 snapshots saved successfully
 
-Phase 10 cross-model compatibility test (5 tests):
-1. Baseline inference — single-turn completion
-2. Snapshot save — verify state is captured
-3. Snapshot restore — verify state loads
-4. Memory leak detection — VRAM/RAM stable across runs
-5. Sequential snapshot save rate — automated multi-turn save
+### Test A: Sequential Conversations (20)
+- **Status**: FAIL (1/20 snapshots saved)
+- WARM tier LRU evicts states before manual save
+- Only the most recently completed conversation has WARM state
 
----
+### Test B: Multi-turn Single Conversation (8 turns)
+- **Status**: PASS
+- All 8 turns and snapshots completed
+- Model consistently responded
 
-## Results
+### Test C: Rapid Fire (100 requests)
+- **Status**: PASS
+- 100/100 successful
+- Avg latency: 0.172s
+- GPU delta: +0MB, RSS delta: +9MB (no leak)
 
-| Test | Result | Notes |
-|------|--------|-------|
-| Baseline inference | PASS | Coherent completions |
-| Snapshot save | PASS | Snapshot written, ~150 MB |
-| Snapshot restore | PASS | State loads, rid=null (pre-existing gap) |
-| Memory leak detection | PASS | Stable VRAM/RAM |
-| Sequential snapshot save rate | PARTIAL | Only 5% save hit rate |
+### Test D: Long Context (2K tokens)
+- **Status**: PASS
+- 2015 prompt tokens handled
+- Snapshot saved successfully
 
-**4/5 PASS (80%), 1 PARTIAL**
+### Test E: Snapshot Directory
+- **Status**: PASS
+- 182 conversation directories
+- 17 safetensors files
+- 2.5GB total snapshot storage
 
----
+## Resource Summary
+| Metric | Start | End | Delta |
+|--------|-------|-----|-------|
+| GPU VRAM | 70,244 MB | 70,500 MB | +256 MB |
+| Process RSS | 14,647 MB | 14,668 MB | +21 MB |
+| Snapshot Storage | 0 MB | 2,478 MB | +2,478 MB |
 
-## Key Metrics
+## Memory Leak Assessment
+- **GPU**: No leak detected. +256MB across ~150+ requests is within normal variance.
+- **RSS**: No leak detected. +21MB after warmup is excellent.
+- **Snapshots**: Growing as expected (each snapshot ~150MB for 36 mamba layers).
 
-| Metric | Value |
-|--------|-------|
-| Snapshot size | **~150 MB** per conversation turn |
-| Average inference latency | **0.172s** |
-| Sequential save hit rate | **5%** |
-| Stateful recall | BLOCKED (pre-existing restore API gap) |
-| Context length used | 4096 tokens (hardware-constrained) |
+## Key Findings
 
----
+1. **Model loads and serves correctly** with `--context-length 4096 --mem-fraction-static 0.85`
+2. **Snapshot save works reliably** for WARM tier hits
+3. **Snapshot restore (stateful gen) has timeout bug** — deferred output path not connected to HTTP future
+4. **No memory leaks detected** across 150+ requests
+5. **Pure Mamba2 models incompatible** with SGLang (Mamba2ForCausalLM lacks attention backend support)
+6. **granite-4.0-h-small is ~5x larger** than granite-4.0-h-tiny but uses similar VRAM per request
+7. **Snapshot size per conversation**: ~150MB (36 mamba layers, bfloat16)
 
-## Notes
-
-**Sequential snapshot save hit rate (5%):** This is the most significant finding for this model. The WARM tier was sized for smaller models (granite-tiny ~55MB). When granite-small writes ~150MB snapshots in rapid succession, the WARM tier fills quickly and subsequent saves must evict and rewrite — resulting in a low net hit rate when measuring "is this exact snapshot in WARM when needed?". This is a tier sizing issue, not a correctness bug.
-
-**Snapshot size (150 MB):** Granite-small has 36 Mamba2 layers with BF16 weights. Snapshot size scales with (num_mamba_layers × state_size × hidden_size × dtype_bytes). At 36 layers BF16, this is ~3× larger than granite-tiny (8 layers) and ~3× larger than Nemotron-Cascade (MoE with smaller active state).
-
----
-
-## Verdict
-
-**COMPATIBLE** with Engram snapshot infrastructure, with a noted WARM tier sizing limitation for large dense Mamba models. Tier max_warm_memory_gb should be increased proportionally when deploying with 30B+ dense models.
+## Files
+- Test script: test/phases/phase-10-h-small-test.py
+- Detailed results: test/phases/results/phase-10-logs/h-small-detailed-20260330_025425.json
+- Baseline results: test/phases/results/phase-10-logs/h-small-test-20260330_024527.json

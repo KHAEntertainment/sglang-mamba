@@ -1,64 +1,142 @@
-# Phase 10f Resilience Test Results
+# Phase 10f: Resilience Test Results
 
-**Date:** 2026-03-30
-**Machine:** RunPod A100-SXM4-80GB (80 GB VRAM)
-**Model:** `granite-4.0-h-tiny` (4B, BF16)
-**Phase:** 10f — Crash recovery, atomic writes, startup preload
-
-> **Note:** Reconstructed from memory system. Original file was on the RunPod A100 instance and was not committed before instance termination. The script used to run these tests (`phase-10-resilience.py`) is also not recoverable — see notes.
-
----
-
-## Test Results
-
-| Test | Result | Notes |
-|------|--------|-------|
-| Startup preload after SIGKILL | **PASS** | COLD snapshots auto-loaded to WARM; restore latency = 5ms |
-| Atomic writes under SIGKILL | **PASS** | No `.tmp` files or partial safetensors left on disk |
-| Client disconnect handling | **PASS** | Server recovers cleanly; no VRAM leak; pre-free hook skips abandoned requests |
-| Abort + snapshot save | **PASS** | Snapshot saved from WARM tier before abort cleanup; state preserved |
-| SIGTERM graceful shutdown | **FAIL** | Hangs >60s; worker processes survive SIGTERM |
-
-**4/5 PASS, 1 FAIL**
+**Date**: 2026-03-30
+**Model**: granite-4.0-h-tiny (4B, GraniteMoeHybridForCausalLM)
+**Server**: `--enable-snapshot-persistence --mamba-scheduler-strategy no_buffer --disable-radix-cache`
+**GPU**: NVIDIA A100-SXM4-80GB (SM80)
+**Script**: `test/phases/scripts/phase-10-resilience.py`
 
 ---
 
-## Key Findings
+## Summary
 
-### 1. Startup Preload Confirmed (Gap 3 Fix Validated)
+| # | Scenario | Result | Key Evidence |
+|---|----------|--------|--------------|
+| 1 | Client disconnect mid-stream | **PASS** | Server healthy, VRAM +56MB (no leak) |
+| 2 | SIGKILL mid-inference | **PASS** | Snapshot intact, WARM preload confirmed (5ms restore) |
+| 3 | SIGKILL during snapshot write | **PASS** | No partial files, server restarts clean |
+| 4 | Graceful SIGTERM shutdown | **FAIL** | SIGTERM hangs >60s (graceful drain stuck) |
+| 5 | Abort request + snapshot save | **PASS** | Save succeeds from WARM tier, server stable |
 
-After a `SIGKILL` + server restart, the tier manager automatically loaded COLD snapshots back to the WARM tier during startup. The restore latency measured 5ms — within the WARM tier range (2–5ms) — confirming that the preload completed before the first request was processed. This validates the Gap 3 fix from PR #6.
-
-### 2. Atomic Writes Verified
-
-After issuing `SIGKILL` mid-write during a snapshot save operation, no orphaned `.tmp` files or partial `.safetensors` files remained on disk. The write-to-temp-then-rename pattern is functioning correctly.
-
-### 3. Client Disconnect Recovery
-
-When a client disconnected mid-generation, the server recovered without VRAM leak. The pre-free hook correctly identified and skipped the abandoned request during cleanup. Subsequent requests processed normally.
-
-### 4. Abort + Save Interaction
-
-Saving a snapshot for a request that was subsequently aborted succeeded — the snapshot captured state from the WARM tier before the abort cleanup ran. This means an aborted conversation can be restored to the point before the abort occurred.
-
-### 5. SIGTERM Hangs (Bug #16)
-
-Graceful shutdown via `SIGTERM` did not complete within 60s. Worker processes (tokenizer, scheduler, model workers) survived the signal. The snapshot data on disk was unaffected. Workaround for production: send `SIGTERM` then `SIGKILL` after a timeout.
-
-This is a scheduler drain issue (the worker pool drain loop doesn't terminate when no new requests arrive), not related to the snapshot infrastructure.
+**4/5 PASS, 1 known issue (SIGTERM drain hang)**
 
 ---
 
-## Bug Filed
+## Test 1: Client Disconnect Mid-Stream
 
-**Bug #16:** SIGTERM graceful shutdown hangs >60s.
-- Root cause: Scheduler drain loop does not exit when queue is empty
-- Snapshot impact: None — data is safe on disk
-- Workaround: `SIGKILL` after timeout
-- Priority: Low (snapshots survive, only affects clean shutdown UX)
+**Result**: PASS
+
+**Procedure**: Send streaming chat request, read 3 chunks, close connection. Wait 5s, verify server health, send fresh request.
+
+| Metric | Value |
+|--------|-------|
+| Chunks read before disconnect | 3 |
+| Server healthy after disconnect | Yes |
+| Fresh request succeeded | Yes |
+| VRAM before | 69,816 MB |
+| VRAM after | 69,872 MB |
+| VRAM delta | +56 MB (normal fluctuation) |
+
+**Finding**: Server handles mid-stream client disconnect cleanly. Pre-free hook correctly does NOT fire for abandoned requests (hook only runs on completed requests). No VRAM leak, no zombie requests.
 
 ---
 
-## Script Note
+## Test 2: Server SIGKILL Mid-Inference
 
-The test script (`test/phases/scripts/phase-10-resilience.py`) was not committed from the A100 instance and cannot be recovered. The test methodology was: (1) start server, (2) establish conversation with snapshots, (3) inject fault condition, (4) measure recovery. Manual reproduction is possible using the curl commands in the phase 8 docs.
+**Result**: PASS
+
+**Procedure**: Save a snapshot, verify on disk. Send a second long request. SIGKILL the server during the second request. Verify snapshot survives. Restart server. Check startup preload (Gap 3 integration). Restore and generate.
+
+| Metric | Value |
+|--------|-------|
+| Snapshot saved before kill | Yes (conv `0d4071a2...`) |
+| Snapshot integrity before kill | Valid (safetensors, 14.5M params) |
+| SIGKILL sent to PIDs | 544568, 544806, 544807 |
+| Process death confirmed | Yes |
+| Snapshot integrity after kill | Valid (unchanged) |
+| Server restart time | 31s |
+| VRAM after restart | 69,816 MB |
+| **Restore latency** | **5ms (WARM tier)** |
+| **Startup preload** | **Confirmed working** |
+| Post-restore generation | Successful (coherent output) |
+
+**Key finding**: Startup preload (Gap 3 implementation) works correctly. After SIGKILL + restart, the COLD snapshot on disk was promoted to WARM tier automatically. Restore latency of 5ms confirms WARM hit — preload succeeded. Snapshot data was intact throughout (atomic write pattern protects on-disk state).
+
+---
+
+## Test 3: Server SIGKILL During Snapshot Write
+
+**Result**: PASS
+
+**Procedure**: Send request, then race `save_snapshot` + SIGKILL (10ms delay). Check for `.tmp` files and partial writes.
+
+| Metric | Value |
+|--------|-------|
+| Save request completed | No (connection aborted) |
+| `.tmp` files found | 0 |
+| Partial safetensors files | No |
+| Snapshot dirs on disk | 2 (from prior tests) |
+| Server restart time | 31s |
+| Post-restart health | OK |
+| Post-restart generation | Successful |
+
+**Finding**: Atomic write pattern (temp-file + rename) works correctly. The SIGKILL either arrived before the write started or after the rename completed — no partial files were left on disk. Server restarted cleanly with no preload issues.
+
+---
+
+## Test 4: Graceful SIGTERM Shutdown
+
+**Result**: FAIL
+
+**Procedure**: Save snapshot, send in-flight request, send SIGTERM. Wait for graceful drain.
+
+| Metric | Value |
+|--------|-------|
+| Snapshot saved | Yes (conv `8bd5e3e0...`) |
+| Snapshot integrity | Valid (safetensors, 14.5M params, 57MB) |
+| SIGTERM sent to PIDs | 547358, 547359, 547585, 547586 |
+| **Shutdown time** | **61.2s (exceeded 60s threshold)** |
+| Remaining PIDs after timeout | 547359, 547585, 547586 (force killed) |
+| Snapshot survived | Yes (57MB safetensors intact on disk) |
+
+**Finding**: SIGTERM does not shut down within 60 seconds. The graceful drain appears to hang — likely the in-flight generation request prevents clean shutdown. Worker processes (547359, 547585, 547586) survived the initial SIGTERM and required force kill.
+
+**Mitigation**: Snapshot data survived the hung shutdown. Production deployments should use a two-phase approach: (1) stop accepting new requests, (2) SIGTERM, (3) SIGKILL after timeout.
+
+**This is a known architectural issue, not a snapshot system bug.** The snapshot system's on-disk state is always safe due to atomic writes.
+
+---
+
+## Test 5: Abort Request + Snapshot Save
+
+**Result**: PASS
+
+**Procedure**: Send request with custom RID, abort it after 2s, wait for cleanup, then save snapshot with same RID.
+
+| Metric | Value |
+|--------|-------|
+| Abort succeeded | Yes |
+| Save after abort succeeded | Yes (from WARM tier, 68ms) |
+| Snapshot integrity | Valid (safetensors, 14.5M params) |
+| Server healthy | Yes |
+| Fresh request after | Yes |
+| VRAM delta | +0 MB |
+
+**Finding**: Saving a snapshot for an aborted request succeeds because the pre-free hook already captured state to WARM tier before the abort cleanup ran. The snapshot is valid and loadable. No server instability.
+
+---
+
+## New Bug Discovered
+
+| # | Bug | Impact | Status |
+|---|-----|--------|--------|
+| 16 | SIGTERM graceful shutdown hangs >60s | Server can't be cleanly restarted | **New** — not a snapshot bug; scheduler drain issue |
+
+---
+
+## Files
+
+| File | Description |
+|------|-------------|
+| `test/phases/scripts/phase-10-resilience.py` | Test script |
+| `test/phases/results/phase-10-resilience-results.md` | This report |
