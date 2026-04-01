@@ -286,3 +286,8 @@ docs/migration-prep/
 
 # Beads / Dolt files (added by bd init)
 *.db
+
+# Secrets and AI History
+.s3cfg
+.antigravity/
+.gemini/
