@@ -1,14 +1,14 @@
 <div align="center">
 
-<img src="assets/engram-logo-banner.png" alt="Engram" width="400"></img>
+<img src="assets/engram-logo-banner.png" alt="Engram" width="500"></img>
 
-### Stateful inference for Mamba SSM models
+### AI models that remember
 
 [![Built on SGLang](https://img.shields.io/badge/built%20on-SGLang-blue)](https://github.com/sgl-project/sglang)
 [![License](https://img.shields.io/github/license/sgl-project/sglang.svg)](LICENSE)
 
-Save, restore, and persist Mamba hidden state across sessions.
-Zero token waste. Sub-millisecond restore. Constant-size snapshots.
+Stop re-reading every conversation from scratch.
+Save model state. Restore in 2ms. Cut token costs by 94%.
 
 [Quick Start](#quick-start) | [Benchmarks](#benchmarks) | [API Reference](#api-extensions) | [Architecture](#how-it-works)
 
@@ -16,13 +16,31 @@ Zero token waste. Sub-millisecond restore. Constant-size snapshots.
 
 ---
 
+## The Problem: Every AI Conversation Starts From Scratch
+
+When you talk to an AI assistant, every message you send includes the *entire* conversation history. The model reads through everything — your first message, its reply, your follow-up, its reply, and so on — before it can respond to your latest question. Every. Single. Time.
+
+For a short chat, you don't notice. But for a 50-turn conversation, an ongoing project, or an agent running a multi-step task, it adds up fast. The model is re-reading a novel just to write the next paragraph. You're paying for all those tokens. And it's getting slower with every turn.
+
+This happens because today's serving infrastructure treats model state as disposable. Once a response is generated, everything the model understood about your conversation is thrown away. The next request starts from zero.
+
+**What if the model could just... remember where it left off?**
+
+That's what Engram does. New-generation models (Mamba, Mamba2, and hybrids from IBM, NVIDIA, and Alibaba) maintain a compact internal state — a compressed summary of everything they've read. Unlike traditional transformer caches that grow with conversation length, this state stays the same size whether the conversation is 100 tokens or 100,000.
+
+Engram saves that state. Restore it later in about 2 milliseconds. Skip re-reading the entire conversation. Pick up exactly where you left off.
+
+The result: **93.8% fewer tokens processed** on multi-turn conversations. A conversation that takes 6.5 seconds to restart from scratch restores in 2ms. The saved state is constant-size regardless of how long the conversation is.*
+
+<sub>* Snapshot sizes range from ~47MB to ~5.3GB depending on model size and architecture. A 4B-parameter model saves ~56MB; NVIDIA's 120B-parameter flagship saves ~5.3GB. The key property is that snapshot size is fixed for a given model — a 1M-token conversation saves the same bytes as a 1K-token one. All benchmarks measured on IBM Granite 4.0-H-tiny (4B, BF16) unless otherwise noted. See [Benchmarks](#benchmarks) for the full model breakdown.</sub>
+
+---
+
 ## What is Engram?
 
-Engram adds **persistent state infrastructure** to [SGLang](https://github.com/sgl-project/sglang), the high-performance LLM serving engine. It targets Mamba and Mamba2 hybrid models specifically, turning their hidden state from disposable inference overhead into a first-class memory asset.
+Engram adds persistent state infrastructure to [SGLang](https://github.com/sgl-project/sglang), the high-performance LLM serving engine used across 400,000+ GPUs worldwide. It targets Mamba and Mamba2 hybrid models specifically, turning their hidden state from disposable inference overhead into a durable memory asset.
 
-Standard serving infrastructure throws away model state after every session. For transformer KV caches, that's a design trade-off. For Mamba SSMs, it's a design flaw — the hidden state *is* the model's compressed understanding of the conversation. Discarding it means re-processing every token from scratch on every turn.
-
-Engram fixes this. Save a snapshot after any turn, restore it later in ~2ms, skip the entire prefill. The snapshot is constant-size regardless of context length — a 128K-token conversation restores just as fast as a 2K-token one.
+Snapshot persistence, a 3-tier memory hierarchy (VRAM → RAM → disk), configurable retention policies, and an agent tool framework — all built on top of SGLang's existing infrastructure without breaking any of its capabilities.
 
 ## Built on SGLang
 
@@ -39,22 +57,33 @@ Validated on H200 across the full test suite (77/82 pass, 0 regressions):
 | **Token reduction** | 93.8% average across 271 requests, zero failures |
 | **Snapshot restore** | ~2ms warm restore (vs. 6.5s full prefill at 128K context) |
 | **Speedup at 128K** | ~3,250x faster than full prefill |
-| **Snapshot size** | ~56MB constant, regardless of context length (2K–128K) |
+| **Snapshot size** | Constant per model, regardless of context length |
 | **Memory stability** | Zero leaks, stable VRAM under sustained load |
-| **Snapshot size scaling** | Constant — 2K tokens and 128K tokens produce identical snapshot sizes |
+
+#### Snapshot Sizes by Model
+
+| Model | Params | Snapshot Size | Notes |
+|-------|--------|--------------|-------|
+| Nemotron-Cascade-2-30B | 30B | ~47 MB | Smallest — MoE routing, fewer Mamba layers |
+| Granite 4.0-H-tiny | 4B | ~56 MB | Primary benchmark model |
+| Granite 4.0-H-small | 32B | ~146 MB | 36 Mamba layers, BF16 |
+| Nemotron-3-Super-120B | 120B | ~5.3 GB | 88 layers, FP8, LatentMoE |
+| Qwen3-Coder-Next | ~75B | ~23.7 GB | GLA recurrent state (not Mamba2) |
+
+All sizes are constant regardless of conversation length — a 1M-token conversation saves the same bytes as a 1K-token one.
 
 ### Tested Models
 
-All models validated on H200 with stateful recall confirmed (PR #20).
+5 of 6 models fully compatible with stateful recall confirmed across all architectures.
 
-| Model | Vendor | Params | Architecture | Stateful Recall | Notes |
-|-------|--------|--------|-------------|-----------------|-------|
-| Granite 4.0-H-tiny | IBM | 4B | Dense Mamba2 hybrid | ✓ PASS (4/4) | Primary validation model — full phases 0–10 |
-| Granite 4.0-H-small | IBM | 32B | Dense Mamba2 hybrid | ✓ PASS | Base model (no chat template) — use `/v1/completions` |
-| Nemotron-3-Super-120B-A12B | NVIDIA | 120B / 12B active | LatentMoE Mamba2 hybrid | ✓ PASS (4/4) | FP8; requires H200 (133 GB VRAM) |
-| Nemotron-Cascade-2-30B | NVIDIA | 30B / 3B active | MoE Mamba2 hybrid | ✓ PASS | BF16 |
-| Qwen3-Coder-Next | Alibaba | ~75B / 3.9B active | GLA + MoE hybrid | ✓ PASS (4/4) | FP8; set `SGLANG_ENABLE_JIT_DEEPGEMM=0` |
-| Codestral Mamba 7B | Mistral | 7B | Pure Mamba2 | — Blocked | Needs native SGLang model class ([upstream issue](https://github.com/sgl-project/sglang/issues/7429)) |
+| Model | Vendor | Architecture | Format | Stateful Recall | Status |
+|-------|--------|-------------|--------|-----------------|--------|
+| Granite 4.0-H-tiny (4B) | IBM | Dense Mamba2 hybrid | BF16 | PASS | Full suite (Phases 0–10) |
+| Granite 4.0-H-small (32B) | IBM | Dense Mamba2 hybrid | BF16 | PASS | Compat protocol |
+| Nemotron-Cascade-2-30B | NVIDIA | MoE Mamba2 hybrid | BF16 | PASS | Phase 10 cross-model |
+| Nemotron-3-Super-120B-A12B | NVIDIA | LatentMoE Mamba2 hybrid (88L) | FP8 | PASS | 96.4% — 54/56 effective |
+| Qwen3-Coder-Next | Alibaba | Gated Linear Attention + MoE (48L) | FP8 | PASS | 62/62 — zero model-specific failures |
+| Codestral Mamba 7B | Mistral | Pure Mamba2 | BF16 | — | Blocked — pending native SGLang model class |
 
 ## Quick Start
 
