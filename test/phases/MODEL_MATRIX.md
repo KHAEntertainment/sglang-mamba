@@ -75,10 +75,11 @@ SGLang routes Gated Linear Attention (GLA) recurrent state through the same Mamb
 | Model | Result File |
 |-------|-------------|
 | Granite 4.0-H-tiny (phases) | `results/phase-*-granite-4.0-h-tiny-*.md` |
-| Granite 4.0-H-small (Phase 10) | `phase-10-h-small-results.md` — was on RunPod A100, may need recovery |
-| Nemotron-Cascade-2-30B (Phase 10) | `phase-10-nemotron-results.md` — was on RunPod A100, may need recovery |
-| Phase 10 summary | `phase-10-final-report.md` — was on RunPod A100, may need recovery |
-| Nemotron-3-Super-120B FP8 | (standalone — see KHA-203 in Linear) |
+| Granite 4.0-H-small (Phase 10) | `results/phase-10-h-small-results.md` (reconstructed from memory) |
+| Nemotron-Cascade-2-30B (Phase 10) | `results/phase-10-nemotron-results.md` (reconstructed from memory) |
+| Phase 10 summary | `results/phase-10-final-report.md` (reconstructed from memory) |
+| Phase 10f resilience | `results/phase-10-resilience-results.md` (reconstructed from memory) |
+| Nemotron-3-Super-120B FP8 | `results/compat-nemotron-3-super-120b-fp8-20260401.md` |
 | Qwen3-Coder-Next FP8 | `results/compat-qwen3-coder-next-fp8-2026-04-01.md` |
 | Codestral Mamba 7B | (standalone — see KHA-185 in Linear) |
 
