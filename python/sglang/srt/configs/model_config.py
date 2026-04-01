@@ -404,7 +404,12 @@ class ModelConfig:
         self.head_dim = getattr(
             self.hf_text_config,
             "head_dim",
-            self.hf_text_config.hidden_size // self.hf_text_config.num_attention_heads,
+            (
+                self.hf_text_config.hidden_size
+                // self.hf_text_config.num_attention_heads
+                if hasattr(self.hf_text_config, "num_attention_heads")
+                else None
+            ),
         )
         self.v_head_dim = getattr(
             self.hf_text_config,
@@ -543,7 +548,9 @@ class ModelConfig:
 
             self.attention_arch = AttentionArch.MHA
 
-        self.num_attention_heads = self.hf_text_config.num_attention_heads
+        self.num_attention_heads = getattr(
+            self.hf_text_config, "num_attention_heads", 0
+        )
         self.num_key_value_heads = getattr(
             self.hf_text_config, "num_key_value_heads", None
         )
