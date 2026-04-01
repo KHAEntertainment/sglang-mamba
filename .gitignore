@@ -191,6 +191,9 @@ work_dirs/
 *.csv
 
 !logo.png
+!assets/engram-logo-banner.png
+!assets/engram-logo-square.png
+!assets/archive/logo_square.png
 
 # Prerequisites
 *.d
