@@ -66,7 +66,7 @@ The `SessionController` (upstream addition) manages session lifecycle independen
 
 ### Unit Tests: 30 passed, 1 skipped
 
-```
+```text
 test/sglang/snapshot/test_mamba_snapshot.py                      11 passed, 1 skipped
 test/registered/unit/mem_cache/test_mamba_unittest.py             4 passed
 test/registered/radix_cache/test_mamba_radix_cache_comprehensive.py  9 passed
@@ -93,7 +93,7 @@ test/registered/radix_cache/test_mamba_radix_cache_gauntlet.py    6 passed
 
 All snapshot-adjacent modules import without errors:
 
-```
+```text
 sglang.srt.snapshot                    OK
 sglang.srt.snapshot.mamba_snapshot     OK
 sglang.srt.snapshot.tier_manager       OK
@@ -122,7 +122,7 @@ All components confirmed present and functional:
 
 | Component | Files/Items | Status |
 |-----------|-------------|--------|
-| snapshot/ package | 7 files (mamba_snapshot, tier_manager, conversation_tracker, snapshot_policy, snapshot_hooks, mamba_host_pool, __init__) | PRESENT |
+| snapshot/ package | 7 files (mamba_snapshot, tier_manager, conversation_tracker, snapshot_policy, snapshot_hooks, mamba_host_pool, `__init__`) | PRESENT |
 | I/O structs | 10 (Save/Restore/List/GetInfo/Delete Request+Response) | PRESENT |
 | GenerateReqInput.conversation_id | 1 field | PRESENT |
 | Scheduler handlers | 6 (save, restore, list, get_info, delete, hook_trigger) | PRESENT |

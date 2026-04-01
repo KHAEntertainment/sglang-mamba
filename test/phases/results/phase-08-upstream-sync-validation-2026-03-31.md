@@ -109,7 +109,7 @@ Unit tests pass; server test is architecture-blocked, not a regression.
 | test_alternating_long_and_short_requests | 40 | PASS |
 | test_concurrent_multi_turn_conversations | 8×5 turns | PASS |
 | test_server_health_after_stress | 1 | PASS |
-| **Total: 6/6** | **PASS** |
+| **Total: 6/6** | - | **PASS** |
 
 Server healthy post-stress. No CUDA errors, no OOM, no lock_ref violations.
 

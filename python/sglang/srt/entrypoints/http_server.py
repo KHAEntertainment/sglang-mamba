@@ -2244,7 +2244,10 @@ def _setup_and_run_http_server(
         # Create a pre-bound socket so uvicorn can inherit the fd.
         # This reserves the port early and avoids conflicts.
         import socket as _socket
-        _family = _socket.AF_INET6 if ":" in (server_args.host or "") else _socket.AF_INET
+
+        _family = (
+            _socket.AF_INET6 if ":" in (server_args.host or "") else _socket.AF_INET
+        )
         reserved_socket = _socket.socket(family=_family, type=_socket.SOCK_STREAM)
         reserved_socket.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
         if hasattr(_socket, "SO_REUSEPORT"):
@@ -2252,7 +2255,6 @@ def _setup_and_run_http_server(
         reserved_socket.bind((server_args.host or "", server_args.port))
         reserved_socket.set_inheritable(True)
         reserved_socket.listen(128)
-
 
         if server_args.ssl_certfile:
             logger.info(

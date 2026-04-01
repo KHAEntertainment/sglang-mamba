@@ -41,7 +41,7 @@ Merge lower-risk `server_args.py` and `http_server.py` drift from upstream, then
 - `python/sglang/srt/entrypoints/http_server.py`
 - `python/sglang/srt/managers/io_struct.py`
 - `python/sglang/srt/managers/scheduler.py` (flush-cache dispatch)
-- `python/sglang/srt/common.py` → `python/sglang/srt/network.py` (import churn)
+- `python/sglang/srt/common.py` → `python/sglang/srt/utils/network.py` (import churn)
 
 ## Decision Points
 

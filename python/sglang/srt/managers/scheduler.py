@@ -218,7 +218,6 @@ from sglang.srt.utils import (
     get_available_gpu_memory,
     get_bool_env_var,
     get_int_env_var,
-    get_numa_node,
     is_mps,
     kill_itself_when_parent_died,
     point_to_point_pyobj,

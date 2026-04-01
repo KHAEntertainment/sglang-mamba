@@ -10,6 +10,5 @@
     "greptile@claude-plugins-official": true,
     "remember@claude-plugins-official": true
   },
-  "skipDangerousModePermissionPrompt": true,
   "autoDreamEnabled": true
 }

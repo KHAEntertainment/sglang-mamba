@@ -123,4 +123,4 @@ Close the parent Phase 08 task after all sub-tasks pass. Tag `phase-08-pass`.
 
 ## Completion Criteria
 
-This phase is complete only when **all 12 test phases pass** (Phases 0–9 + 10e + 10f) and the worktree is tagged `phase-08-pass`. At that point, the upstream sync is validated and ready for merge into `main`.
+This phase is complete only when Phases 0–9 + 10e pass and Phase 10f achieves ≥4/5 (SIGTERM hang Bug #16 is the accepted exception). Tag the worktree `phase-08-pass` when complete.

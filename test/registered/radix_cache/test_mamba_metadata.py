@@ -1,4 +1,4 @@
-from sglang.test.ci.ci_register import register_cuda_ci, register_amd_ci
+from sglang.test.ci.ci_register import register_amd_ci, register_cuda_ci
 
 register_cuda_ci(est_time=20, suite="stage-b-test-small-1-gpu")
 register_amd_ci(est_time=20, suite="stage-b-test-small-1-gpu-amd")
@@ -29,7 +29,9 @@ class TestMamba2Metadata(unittest.TestCase):
         N = 4
         seq_lens = torch.ones(N, dtype=torch.int32)
         fwd_meta = _make_forward_metadata(num_seqs=N)
-        result = Mamba2Metadata.prepare_decode(fwd_meta, seq_lens, is_target_verify=False, draft_token_num=1)
+        result = Mamba2Metadata.prepare_decode(
+            fwd_meta, seq_lens, is_target_verify=False, draft_token_num=1
+        )
         self.assertEqual(result.num_prefills, 0)
         self.assertEqual(result.num_decodes, N)
         self.assertEqual(result.num_prefill_tokens, 0)
@@ -39,7 +41,9 @@ class TestMamba2Metadata(unittest.TestCase):
         N = 3
         query_start_loc = torch.tensor([0, 5, 10, 15], dtype=torch.int32)
         mamba_cache_indices = torch.arange(N, dtype=torch.int32)
-        fwd_meta = ForwardMetadata(query_start_loc=query_start_loc, mamba_cache_indices=mamba_cache_indices)
+        fwd_meta = ForwardMetadata(
+            query_start_loc=query_start_loc, mamba_cache_indices=mamba_cache_indices
+        )
         forward_batch = MagicMock()
         forward_batch.extend_num_tokens = 15
         forward_batch.extend_seq_lens = [5] * N
@@ -61,14 +65,21 @@ class TestMamba2Metadata(unittest.TestCase):
         query_start_loc = torch.tensor([0, 5, 10], dtype=torch.int32)
         chunk_size = 8
         total_seqlens = 10
-        chunk_indices, chunk_offsets = Mamba2Metadata._query_start_loc_to_chunk_indices_offsets(
-            query_start_loc, chunk_size, total_seqlens)
+        chunk_indices, chunk_offsets = (
+            Mamba2Metadata._query_start_loc_to_chunk_indices_offsets(
+                query_start_loc, chunk_size, total_seqlens
+            )
+        )
         expected_indices = torch.tensor([0, 0, 1], dtype=torch.int32)
         expected_offsets = torch.tensor([0, 5, 0], dtype=torch.int32)
-        self.assertTrue(torch.equal(chunk_indices, expected_indices),
-                        f"chunk_indices mismatch: got {chunk_indices}, expected {expected_indices}")
-        self.assertTrue(torch.equal(chunk_offsets, expected_offsets),
-                        f"chunk_offsets mismatch: got {chunk_offsets}, expected {expected_offsets}")
+        self.assertTrue(
+            torch.equal(chunk_indices, expected_indices),
+            f"chunk_indices mismatch: got {chunk_indices}, expected {expected_indices}",
+        )
+        self.assertTrue(
+            torch.equal(chunk_offsets, expected_offsets),
+            f"chunk_offsets mismatch: got {chunk_offsets}, expected {expected_offsets}",
+        )
 
     def test_has_initial_states_flag(self):
         N = 4
@@ -83,7 +94,9 @@ class TestMamba2Metadata(unittest.TestCase):
         forward_batch.extend_num_tokens = 20
         forward_batch.extend_seq_lens = [5] * N
         forward_batch.extend_seq_lens_cpu = [5] * N
-        forward_batch.extend_prefix_lens = torch.tensor([10, 5, 0, 0], dtype=torch.int32)
+        forward_batch.extend_prefix_lens = torch.tensor(
+            [10, 5, 0, 0], dtype=torch.int32
+        )
         forward_batch.seq_lens = torch.tensor([5] * N, dtype=torch.int32)
         forward_batch.spec_info = None
         forward_batch.forward_mode = MagicMock()
@@ -92,8 +105,10 @@ class TestMamba2Metadata(unittest.TestCase):
         result = Mamba2Metadata.prepare_mixed(fwd_meta, chunk_size, forward_batch)
         self.assertIsNotNone(result.mixed_metadata)
         expected_has_initial = torch.tensor([True, True, False, False])
-        self.assertTrue(torch.equal(result.mixed_metadata.has_initial_states, expected_has_initial),
-                        f"has_initial_states: got {result.mixed_metadata.has_initial_states}")
+        self.assertTrue(
+            torch.equal(result.mixed_metadata.has_initial_states, expected_has_initial),
+            f"has_initial_states: got {result.mixed_metadata.has_initial_states}",
+        )
         self.assertTrue(result.mixed_metadata.prep_initial_states)
 
     def test_mamba_cache_indices_preserved(self):
@@ -104,9 +119,13 @@ class TestMamba2Metadata(unittest.TestCase):
             mamba_cache_indices=indices,
         )
         seq_lens = torch.ones(N, dtype=torch.int32)
-        result = Mamba2Metadata.prepare_decode(fwd_meta, seq_lens, is_target_verify=False, draft_token_num=1)
-        self.assertTrue(torch.equal(result.mamba_cache_indices, indices),
-                        f"mamba_cache_indices changed: got {result.mamba_cache_indices}")
+        result = Mamba2Metadata.prepare_decode(
+            fwd_meta, seq_lens, is_target_verify=False, draft_token_num=1
+        )
+        self.assertTrue(
+            torch.equal(result.mamba_cache_indices, indices),
+            f"mamba_cache_indices changed: got {result.mamba_cache_indices}",
+        )
 
 
 if __name__ == "__main__":

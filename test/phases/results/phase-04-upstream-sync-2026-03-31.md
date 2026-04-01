@@ -39,7 +39,7 @@ Reconcile upstream's new Mamba cache hierarchy (HiMambaRadixCache, HybridCacheCo
 | 9 | `cfead25bb` | Qwen3.5 mamba slice fix for TP size mismatch | Clean |
 | 10 | `0949b138a` | Simplify server startup output | 4 (main.py, serve.py, launch_server.py, compile.py) |
 
-**Total: 17 upstream commits integrated, 14 conflict-free, 3 with minor conflicts.**
+**Total: 17 upstream commits integrated, 11 conflict-free, 6 with conflicts.**
 
 ### Supporting Commits (2)
 

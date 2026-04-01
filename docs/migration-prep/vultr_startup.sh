@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Vultr Startup Script for SGLang-Mamba A100 VM
 
 # 1. System Updates & Dependencies
@@ -7,9 +8,9 @@ apt-get update
 apt-get install -y git python3-pip python3-venv curl wget
 
 # 2. Setup Repository
-cd /root
+cd /root || { echo "Failed to cd /root"; exit 1; }
 git clone https://github.com/KHAEntertainment/sglang-mamba.git
-cd sglang-mamba
+cd sglang-mamba || { echo "Failed to cd sglang-mamba — did git clone fail?"; exit 1; }
 pip3 install --break-system-packages --upgrade pip
 pip3 install --break-system-packages -e "python[all]"
 

@@ -144,7 +144,7 @@ Streaming sessions (runtime KV sharing via `SessionAwareCache`) and snapshot per
 
 ## Commits in This Phase
 
-```
+```text
 47e7f0743 fix: guard cutedsl_gdn import for missing cutlass.cute.nvgpu
 1d906a894 revert: undo awq/engine workarounds, restore sgl-kernel 0.3.21
 4b74fc896 fix: graceful fallback for awq_marlin_repack imports

@@ -99,7 +99,9 @@ class TestMambaRadixCacheServerIntegration(unittest.TestCase):
         messages = []
 
         # Turn 1
-        messages.append({"role": "user", "content": "My name is Alex and I like the number 42."})
+        messages.append(
+            {"role": "user", "content": "My name is Alex and I like the number 42."}
+        )
         t1 = self._chat(messages, max_tokens=80)["choices"][0]["message"]["content"]
         messages.append({"role": "assistant", "content": t1})
 
@@ -114,12 +116,19 @@ class TestMambaRadixCacheServerIntegration(unittest.TestCase):
         messages.append({"role": "assistant", "content": t3})
 
         # Turn 4
-        messages.append({"role": "user", "content": "What would you add to 42 to get 100?"})
+        messages.append(
+            {"role": "user", "content": "What would you add to 42 to get 100?"}
+        )
         t4 = self._chat(messages, max_tokens=80)["choices"][0]["message"]["content"]
         messages.append({"role": "assistant", "content": t4})
 
         # Turn 5
-        messages.append({"role": "user", "content": "Summarize what you know about me in one sentence."})
+        messages.append(
+            {
+                "role": "user",
+                "content": "Summarize what you know about me in one sentence.",
+            }
+        )
         t5 = self._chat(messages, max_tokens=80)["choices"][0]["message"]["content"]
 
         # Basic coherence checks
