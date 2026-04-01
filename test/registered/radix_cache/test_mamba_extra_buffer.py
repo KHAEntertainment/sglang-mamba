@@ -51,6 +51,7 @@ def _make_pool_extra_buffer(
         device=device,
         enable_memory_saver=False,
         cache_params=cache_params,
+        mamba_layer_ids=mamba_layers,
         enable_mamba_extra_buffer=True,
         speculative_num_draft_tokens=speculative_num_draft_tokens,
     )
