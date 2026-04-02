@@ -2,7 +2,7 @@
 
 This document tracks all models validated against the Engram snapshot infrastructure. Each row represents a completed run of the [Model Compatibility Protocol](MODEL_COMPAT_PROTOCOL.md).
 
-**Last updated:** 2026-04-01
+**Last updated:** 2026-04-01 (stateful recall re-run post PR #20)
 
 ---
 
@@ -11,21 +11,25 @@ This document tracks all models validated against the Engram snapshot infrastruc
 | Model | Vendor | Architecture | Recurrent Type | Format | Params (Total/Active) | Test Protocol | Pass Rate | Stateful Recall | Verdict | Date | Issue |
 |-------|--------|-------------|----------------|--------|----------------------|---------------|-----------|-----------------|---------|------|-------|
 | Granite 4.0-H-tiny | IBM | `GraniteMoeHybridForCausalLM` | Mamba2 SSM | BF16 | 4B | Full phases 0–8 + 10 | 77/82 (93.9%) | PASS | COMPATIBLE | 2026-03-31 | — |
-| Granite 4.0-H-small | IBM | `GraniteMoeHybridForCausalLM` | Mamba2 SSM | BF16 | 32B | Phase 10 cross-model⁴ | 4/5 (80%) | BLOCKED² | COMPATIBLE | 2026-03-29 | — |
-| Nemotron-Cascade-2-30B | NVIDIA | `NemotronHForCausalLM` | Mamba2 SSM | BF16 | 30B / 3B active | Phase 10 cross-model⁴ | 5/5 (100%) | BLOCKED² | COMPATIBLE | 2026-03-29 | — |
-| Nemotron-3-Super-120B-A12B | NVIDIA | `NemotronHForCausalLM` | Mamba2 SSM | FP8 | 120B / 12B active | Ad-hoc (partial)¹ | 54/56 (96.4%) | BLOCKED² | COMPATIBLE | 2026-04-01 | KHA-203 |
-| Qwen3-Coder-Next | Alibaba | `Qwen3NextForCausalLM` | Gated Linear Attention | FP8 | ~75B / 3.9B active | Compat protocol (full) | 62/62 (100%) | BLOCKED² | COMPATIBLE | 2026-04-01 | KHA-204 |
+| Granite 4.0-H-small | IBM | `GraniteMoeHybridForCausalLM` | Mamba2 SSM | BF16 | 32B | Compat protocol (full)⁵ | 0 model-specific failures | PASS⁶ | COMPATIBLE | 2026-04-01 | — |
+| Nemotron-Cascade-2-30B | NVIDIA | `NemotronHForCausalLM` | Mamba2 SSM | BF16 | 30B / 3B active | Phase 10 cross-model⁴ | 5/5 (100%) | PASS⁶ | COMPATIBLE | 2026-04-01 | — |
+| Nemotron-3-Super-120B-A12B | NVIDIA | `NemotronHForCausalLM` | Mamba2 SSM | FP8 | 120B / 12B active | Ad-hoc (partial)¹ | 54/56 (96.4%) | PASS (4/4)⁶ | COMPATIBLE | 2026-04-01 | KHA-203 |
+| Qwen3-Coder-Next | Alibaba | `Qwen3NextForCausalLM` | Gated Linear Attention | FP8 | ~75B / 3.9B active | Compat protocol (full) | 62/62 (100%) | PASS (4/4)⁶ | COMPATIBLE | 2026-04-01 | KHA-204 |
 | Codestral Mamba 7B | Mistral | `Mamba2ForCausalLM` | Mamba2 SSM (pure) | BF16 | 7B | Gate 1 only | 0/0 | — | BLOCKED³ | 2026-03-31 | KHA-185 |
 
 ### Footnotes
 
 ¹ **Ad-hoc (partial):** Ran registered test suites (phases 2, 3, 5, 7, 8 equivalent) plus manual baseline checks. Did NOT run formal phase 0 environment verification, phase 4 log-line inspection, or phase 6 extra_buffer strategy. Stateful recall (phase 8 semantic) not validated. Future runs should use the [Model Compatibility Protocol](MODEL_COMPAT_PROTOCOL.md).
 
-² **BLOCKED (stateful recall):** Restore API gap — the restore endpoint succeeds but the subsequent generate call doesn't use the restored state for inline generation. This is a pre-existing infrastructure limitation tracked since PR #6, not a model-specific issue.
+² **BLOCKED (stateful recall):** ~~Restore API gap — fixed in PR #20.~~ No longer applicable — see footnote ⁶.
+
+⁶ **PASS (stateful recall, post PR #20):** Re-validated 2026-04-01 after PR #20 merged. `restore_snapshot` with `continuation_ids` + `create_new_request=true` now correctly runs stateful generation and returns `output_text`. All 4 previously-blocked models recalled a fact established in a prior turn using only the new continuation tokens. Results in `results/stateful-recall-rerun-20260401.md`.
 
 ³ **BLOCKED (no model class):** SGLang has no native `Mamba2ForCausalLM` model class for pure Mamba2 architectures. Only HuggingFace Transformers fallback exists. Tracked in upstream sglang issues #7429 and #18458.
 
-⁴ **Phase 10 cross-model:** 5 structured compatibility tests per model covering: baseline inference, snapshot save/restore, memory leak detection, rapid-fire throughput, and snapshot sizing. Run on RunPod A100-SXM4-80GB. Result files (`phase-10-final-report.md`, `phase-10-nemotron-results.md`, `phase-10-h-small-results.md`) were on the A100 instance — may need recovery if not committed before instance termination.
+⁴ **Phase 10 cross-model:** 5 structured compatibility tests per model covering: baseline inference, snapshot save/restore, memory leak detection, rapid-fire throughput, and snapshot sizing. Run on RunPod A100-SXM4-80GB. Result files recovered from `backup/phase-10-model-testing-20260330` branch.
+
+⁵ **Compat protocol (base model):** Full protocol run on H200. granite-small has no chat template (base model, not instruction-tuned). 14 test failures = chat endpoint returning HTTP 400 (test harness assumes instruction-tuned model). 2 failures = pre-existing restore API gap (all models). Zero model-specific infrastructure failures. Custom gauntlet using `/generate` endpoint: 142/142 PASS.
 
 ---
 
@@ -65,7 +69,7 @@ SGLang routes Gated Linear Attention (GLA) recurrent state through the same Mamb
 | Nemotron-3-Super-120B FP8 | Bug found: `is_multimodal_gen` missing from ModelConfig (commit `e224e2512`). |
 | Codestral Mamba 7B | Bug found: `Mamba2Config` missing `num_attention_heads` — fixed with hasattr guards (commit `10ec1e4c4`). |
 | Nemotron-Cascade-2-30B | Star performer in Phase 10: 3x faster inference than granite-small (0.059s vs 0.172s), 100% snapshot save rate, ~47MB per snapshot. Recommended as primary test model for speed. |
-| Granite 4.0-H-small | Snapshot save works (WARM tier, 0.153s latency) but sequential save rate only 5% — tier sizing issue. ~150MB per snapshot (36 mamba layers, bf16). Loaded with `--context-length 4096 --mem-fraction-static 0.85` on A100 80GB. |
+| Granite 4.0-H-small | **Base model — no chat template.** All `/v1/chat/completions` tests fail HTTP 400; use `/v1/completions` or `/generate`. Snapshot save: 145.7MB, instant WARM tier hit. Gauntlet 142/142 via `/generate`. VRAM: 130.3 GB / 143.8 GB on H200. Piecewise CUDA graph disabled (non-GQA attention). |
 | All reasoning models | Default `temperature=1.0` and `<think>` CoT blocks can cause test failures in harnesses that expect deterministic short answers. Set `temperature=0` explicitly in test prompts. |
 
 ---
@@ -75,10 +79,11 @@ SGLang routes Gated Linear Attention (GLA) recurrent state through the same Mamb
 | Model | Result File |
 |-------|-------------|
 | Granite 4.0-H-tiny (phases) | `results/phase-*-granite-4.0-h-tiny-*.md` |
-| Granite 4.0-H-small (Phase 10) | `results/phase-10-h-small-results.md` (reconstructed from memory) |
-| Nemotron-Cascade-2-30B (Phase 10) | `results/phase-10-nemotron-results.md` (reconstructed from memory) |
-| Phase 10 summary | `results/phase-10-final-report.md` (reconstructed from memory) |
-| Phase 10f resilience | `results/phase-10-resilience-results.md` (reconstructed from memory) |
+| Granite 4.0-H-small (Phase 10) | `results/phase-10-h-small-results.md` |
+| Granite 4.0-H-small (compat protocol) | `results/compat-granite-4.0-h-small-20260401.md` |
+| Nemotron-Cascade-2-30B (Phase 10) | `results/phase-10-nemotron-results.md` |
+| Phase 10 summary | `results/phase-10-final-report.md` |
+| Phase 10f resilience | `results/phase-10-resilience-results.md` |
 | Nemotron-3-Super-120B FP8 | `results/compat-nemotron-3-super-120b-fp8-20260401.md` |
 | Qwen3-Coder-Next FP8 | `results/compat-qwen3-coder-next-fp8-2026-04-01.md` |
 | Codestral Mamba 7B | (standalone — see KHA-185 in Linear) |
