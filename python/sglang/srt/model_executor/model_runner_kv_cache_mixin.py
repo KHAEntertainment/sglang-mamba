@@ -169,8 +169,37 @@ class ModelRunnerKVCacheMixin:
         rest_memory = post_model_load_memory - pre_model_load_memory * (
             1 - self.mem_fraction_static
         )
+
+        if cell_size == 0:
+            # Pure SSM model with no attention layers — KV cache is not the
+            # limiting factor. Compute token capacity based on Mamba state
+            # constraints instead.
+            if self.mambaish_config is not None:
+                # Call handle_max_mamba_cache to compute max_mamba_cache_size
+                rest_memory = self.handle_max_mamba_cache(rest_memory)
+                # For pure SSM, token capacity is bounded by the context length
+                # and available memory. Use a conservative estimate based on
+                # the model's context length as the per-request token budget.
+                max_tokens_per_req = self.model_config.context_len
+                # Compute how many such requests fit in available memory
+                # (rest_memory is in GB, convert to bytes)
+                return int(rest_memory * (1 << 30) // (max_tokens_per_req * 2))  # 2 bytes per token for bf16 activations
+            else:
+                # Fallback: if no Mamba config, use available memory with a
+                # conservative per-token estimate
+                return int(rest_memory * (1 << 30) // 2)
+
         if self.mambaish_config is not None:
             rest_memory = self.handle_max_mamba_cache(rest_memory)
+
+        if cell_size == 0:
+            # Pure SSM model with no attention layers — the KV token pool is
+            # empty so its slot count is not the memory bottleneck.  Mamba state
+            # sizing (handle_max_mamba_cache above) is what actually bounds
+            # capacity, and _resolve_max_num_reqs enforces that limit via
+            # max_mamba_cache_size // ratio.  Return a large fixed count so the
+            # token pool allocator succeeds without wasting real memory.
+            return 1 << 20  # 1M token slots
 
         return int(rest_memory * (1 << 30)) // cell_size
 
