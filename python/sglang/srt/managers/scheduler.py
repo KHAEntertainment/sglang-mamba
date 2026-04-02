@@ -1023,6 +1023,7 @@ class Scheduler(
                     snapshot_manager=self.snapshot_manager,
                     enable_background_cleanup=server_args.enable_tier_background_cleanup,
                     cleanup_interval=server_args.tier_cleanup_interval,
+                    model_path=server_args.model_path,
                 )
 
                 logger.info(

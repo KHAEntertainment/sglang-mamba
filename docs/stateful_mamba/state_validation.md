@@ -45,7 +45,7 @@ Validation runs at four points in the data path, plus one additional gate during
 
 Validation runs before any I/O. If it fails, no files are written and a `ValueError` is raised. This is the primary guard preventing poisoned state from entering persistent storage.
 
-```
+```text
 extract from GPU → validate → [GATE] → atomic write to disk
                                 ^
                           hard fail here
