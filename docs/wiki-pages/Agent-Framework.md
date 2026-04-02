@@ -1,5 +1,7 @@
 # SGLang Agent Framework
 
+> This page consolidates documentation originally in `docs/agent_framework/` in the repo.
+
 🤖 **Stateful Tool-Calling Framework for Mamba Models**
 
 The SGLang Agent Framework enables stateful, tool-calling capabilities for Mamba language models with multi-tier memory management and comprehensive REST/WebSocket APIs.
@@ -49,12 +51,6 @@ curl -X POST http://localhost:30000/v1/agent/tools/execute \
 - **Pydantic Validation**: Type-safe request/response models
 - **OpenAPI Compatible**: Auto-generated schemas
 
-### 📚 Comprehensive Documentation
-- **API Reference**: Complete endpoint documentation
-- **Architecture Guide**: System design and internals
-- **Integration Guide**: Python/JavaScript clients
-- **Code Examples**: 50+ examples across languages
-
 ## Architecture
 
 ```
@@ -67,7 +63,6 @@ curl -X POST http://localhost:30000/v1/agent/tools/execute \
 │                    Agent Framework                           │
 │  ┌──────────────┬──────────────┬──────────────────────────┐ │
 │  │ Tool System  │ Memory Tiers │  Snapshot Persistence    │ │
-│  │              │              │                          │ │
 │  │ - Registry   │ - Active     │  - Mamba State           │ │
 │  │ - Executor   │ - Warm       │  - Serialization         │ │
 │  │ - Parser     │ - Cold       │  - Disk I/O              │ │
@@ -181,14 +176,12 @@ async def stream_tool():
     uri = "ws://localhost:30000/v1/agent/ws"
 
     async with websockets.connect(uri) as ws:
-        # Execute tool
         await ws.send(json.dumps({
             "command": "execute_tool",
             "tool_name": "calculator",
             "parameters": {"expression": "2 + 2"}
         }))
 
-        # Receive events
         while True:
             event = json.loads(await ws.recv())
             if event['type'] == 'tool_result':
@@ -205,16 +198,16 @@ asyncio.run(stream_tool())
 ```bash
 # Snapshot Persistence
 --enable-snapshot-persistence       # Enable Mamba state persistence
---snapshot-dir /path/to/snapshots   # Snapshot directory (default: ./snapshots)
+--snapshot-dir /path/to/snapshots # Snapshot directory (default: ./snapshots)
 
 # Memory Tiers
---enable-memory-tiers               # Enable 3-tier memory management
---tier-active-timeout 300           # Active→Warm timeout (seconds)
---tier-warm-timeout 1800            # Warm→Cold timeout (seconds)
---tier-cleanup-interval 60          # Cleanup cycle interval (seconds)
+--enable-memory-tiers              # Enable 3-tier memory management
+--tier-active-timeout 300          # Active→Warm timeout (seconds)
+--tier-warm-timeout 1800          # Warm→Cold timeout (seconds)
+--tier-cleanup-interval 60         # Cleanup cycle interval (seconds)
 
 # Agent Tools
---enable-agent-tools                # Enable tool-calling framework
+--enable-agent-tools               # Enable tool-calling framework
 ```
 
 ### Example Configurations
@@ -327,14 +320,6 @@ Search memory by keyword.
 | Warm   | RAM     | ~10ms   | Medium   | Recent conversations        |
 | Cold   | Disk    | ~100ms  | Large    | Long-term storage           |
 
-## Documentation
-
-- **[API Reference](API_REFERENCE.md)** - Complete endpoint documentation
-- **[Architecture](ARCHITECTURE.md)** - System design and internals
-- **[Integration Guide](INTEGRATION_GUIDE.md)** - Setup and clients
-- **[Examples](EXAMPLES.md)** - Code examples (Python, JavaScript, HTML)
-- **[PR Summary](PULL_REQUEST_SUMMARY.md)** - Complete PR overview
-
 ## Backward Compatibility
 
 ✅ **100% backward compatible** - All features are opt-in via command-line flags.
@@ -345,17 +330,6 @@ python -m sglang.launch_server --model-path <model>
 # → No agent features, existing behavior
 ```
 
-## Testing
-
-```bash
-# Run agent framework tests
-pytest test/sglang/agents/
-pytest test/sglang/snapshot/
-
-# Run API tests
-pytest test/sglang/agents/api/
-```
-
 ## Dependencies
 
 **No new external dependencies!** All features use existing dependencies:
@@ -363,29 +337,8 @@ pytest test/sglang/agents/api/
 - Pydantic (already in requirements)
 - asyncio (Python stdlib)
 
-## License
+## Related Documentation
 
-Same as SGLang - Apache 2.0
-
-## Contributing
-
-See [CONTRIBUTING.md](../../CONTRIBUTING.md) for guidelines.
-
-## Support
-
-- **Issues**: https://github.com/sgl-project/sglang/issues
-- **Discussions**: https://github.com/sgl-project/sglang/discussions
-- **Documentation**: `docs/agent_framework/`
-
-## Citation
-
-If you use the agent framework in your research, please cite:
-
-```bibtex
-@software{sglang_agent_framework,
-  title = {SGLang Agent Framework: Stateful Tool-Calling for Mamba Models},
-  author = {SGLang Team},
-  year = {2025},
-  url = {https://github.com/sgl-project/sglang}
-}
-```
+- [Stateful Mamba Guide](./Stateful-Mamba-Guide.md) - Snapshot persistence system
+- [Upstream Sync](./Upstream-Sync-Q1-2026.md) - Q1 2026 upstream synchronization history
+- [GitHub Repo](https://github.com/KHAEntertainment/sglang-mamba)

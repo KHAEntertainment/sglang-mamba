@@ -57,6 +57,15 @@ Each phase writes a detailed markdown report to `test/phases/results/phase-NN-<m
 - **Registered test dir**: `test/registered/radix_cache/`
 - **HITL interface**: Available for qualitative smoke checks where noted.
 
+## Multi-Model Testing
+
+The phase suite above is designed for deep validation of a single model (configured in `config.sh`). For testing new models against Engram:
+
+- **[MODEL_COMPAT_PROTOCOL.md](MODEL_COMPAT_PROTOCOL.md)** — Standardized agent prompt for validating any new model. Covers the critical gates from the full phase suite in a single session. Produces consistent, comparable results.
+- **[MODEL_MATRIX.md](MODEL_MATRIX.md)** — Cross-model compatibility matrix. The canonical reference for which models have been tested, what passed, and what's known to be broken.
+
+New model results go in `results/compat-<model>-<date>.md`.
+
 ## Reporting Convention
 
 At the end of each phase session, the executing agent should output:
