@@ -42,6 +42,7 @@ from sglang.srt.configs import (
     KimiLinearConfig,
     Lfm2Config,
     Lfm2MoeConfig,
+    Mamba2Config,
     NemotronH_Nano_VL_V2_Config,
     NemotronHConfig,
     Qwen3_5Config,
@@ -1779,6 +1780,9 @@ class ModelRunner(ModelRunnerKVCacheMixin):
                 return None
             else:
                 return config
+
+        if isinstance(config, Mamba2Config):
+            return config
 
         return None
 

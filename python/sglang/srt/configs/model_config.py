@@ -64,6 +64,7 @@ def is_deepseek_nsa(config) -> bool:
     )
     return (
         architectures is not None
+        and len(architectures) > 0
         and architectures[0]
         in [
             "DeepseekV3ForCausalLM",
@@ -156,7 +157,10 @@ class ModelConfig:
                 "Llama4ForConditionalGeneration",
                 "Step3VLForConditionalGeneration",
             ]
-            if self.hf_config.architectures[0] in mm_disabled_models:
+            if not self.hf_config.architectures:
+                # Pure SSM models (e.g. Mamba2) have no architecture string
+                enable_multimodal = False
+            elif self.hf_config.architectures[0] in mm_disabled_models:
                 enable_multimodal = False
                 logger.info(
                     f"Multimodal is disabled for {self.hf_config.model_type}. To enable it, set --enable-multimodal."
@@ -283,6 +287,8 @@ class ModelConfig:
 
     def _config_draft_model(self):
         is_draft_model = self.is_draft_model
+        if not self.hf_config.architectures:
+            return  # Pure SSM models have no draft model variants
 
         if is_draft_model and self.hf_config.architectures[0] in [
             "DeepseekV3ForCausalLM",
@@ -363,10 +369,13 @@ class ModelConfig:
                 )
             )
 
-        self.is_hybrid_swa_compress = self.hf_config.architectures[0] in [
-            "MiMoV2FlashForCausalLM",
-            "MiMoV2MTP",
-        ]
+        self.is_hybrid_swa_compress = (
+            self.hf_config.architectures
+            and self.hf_config.architectures[0] in [
+                "MiMoV2FlashForCausalLM",
+                "MiMoV2MTP",
+            ]
+        )
 
     def _derive_context_length(self, context_length: int):
         is_draft_model = self.is_draft_model

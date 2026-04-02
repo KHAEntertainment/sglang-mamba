@@ -165,6 +165,11 @@ class ModelRunnerKVCacheMixin:
             num_layers = self.num_effective_layers
 
         cell_size = self.get_cell_size_per_token(num_layers)
+        if cell_size == 0:
+            # Pure SSM model with no attention layers — KV cache is not the
+            # limiting factor.  Mamba cache sizing (handle_max_mamba_cache)
+            # governs request capacity instead.
+            cell_size = 1
 
         rest_memory = post_model_load_memory - pre_model_load_memory * (
             1 - self.mem_fraction_static
