@@ -140,49 +140,62 @@ class StateHealthMonitor:
         anomalous_layers: List[int] = []
         details: Dict[int, dict] = {}
 
-        # Check conv_states (one tensor per layer group)
-        for layer_idx, tensor in enumerate(conv_states):
-            norm = torch.linalg.norm(tensor.float()).item()
+        # Track layer index across all state tensors
+        layer_idx = 0
+
+        # Check conv_states — iterate over the leading (layer) dimension
+        for tensor in conv_states:
+            num_layers = tensor.shape[0]
+            for i in range(num_layers):
+                norm = torch.linalg.norm(tensor[i].float()).item()
+                is_anomalous = baseline.is_anomalous(
+                    layer_idx, norm, self._sigma_threshold
+                )
+                mean, std, count = baseline.get_stats(layer_idx)
+
+                if is_anomalous:
+                    anomalous_layers.append(layer_idx)
+                    sigma_dev = abs(norm - mean) / std if std > 0 else float("inf")
+                    details[layer_idx] = {
+                        "norm": norm,
+                        "mean": mean,
+                        "std": std,
+                        "sigma_deviation": sigma_dev,
+                        "source": "conv_state",
+                    }
+                else:
+                    # Only update baseline with non-anomalous values
+                    baseline.update(layer_idx, norm)
+
+                layer_idx += 1
+
+        # Check temporal_states — iterate over the leading (layer) dimension
+        num_temporal_layers = temporal_states.shape[0]
+        for i in range(num_temporal_layers):
+            norm = torch.linalg.norm(temporal_states[i].float()).item()
             is_anomalous = baseline.is_anomalous(
                 layer_idx, norm, self._sigma_threshold
             )
             mean, std, count = baseline.get_stats(layer_idx)
-            baseline.update(layer_idx, norm)
 
             if is_anomalous:
                 anomalous_layers.append(layer_idx)
-                sigma_dev = abs(norm - mean) / std if std > 0 else float("inf")
+                sigma_dev = (
+                    abs(norm - mean) / std
+                    if std > 0
+                    else float("inf")
+                )
                 details[layer_idx] = {
                     "norm": norm,
                     "mean": mean,
                     "std": std,
                     "sigma_deviation": sigma_dev,
-                    "source": "conv_state",
+                    "source": "temporal_states",
                 }
+            else:
+                baseline.update(layer_idx, norm)
 
-        # Check temporal_states as a single aggregate
-        temporal_layer_idx = len(conv_states)
-        temporal_norm = torch.linalg.norm(temporal_states.float()).item()
-        is_temporal_anomalous = baseline.is_anomalous(
-            temporal_layer_idx, temporal_norm, self._sigma_threshold
-        )
-        t_mean, t_std, t_count = baseline.get_stats(temporal_layer_idx)
-        baseline.update(temporal_layer_idx, temporal_norm)
-
-        if is_temporal_anomalous:
-            anomalous_layers.append(temporal_layer_idx)
-            sigma_dev = (
-                abs(temporal_norm - t_mean) / t_std
-                if t_std > 0
-                else float("inf")
-            )
-            details[temporal_layer_idx] = {
-                "norm": temporal_norm,
-                "mean": t_mean,
-                "std": t_std,
-                "sigma_deviation": sigma_dev,
-                "source": "temporal_states",
-            }
+            layer_idx += 1
 
         return HealthCheckResult(
             healthy=len(anomalous_layers) == 0,

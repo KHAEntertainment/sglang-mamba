@@ -101,8 +101,9 @@ def test_health_monitor_single_layer_anomaly():
         temporal = _make_temporal_states(scale=1.0)
         monitor.check_state_health("conv-1", conv, temporal, turn_number=i)
 
-    # Spike conv_states by 100x
-    conv_spike = _make_conv_states(scale=100.0)
+    # Spike only layer 0 of conv_states
+    conv_spike = _make_conv_states(scale=1.0)
+    conv_spike[0][0] *= 100.0  # spike layer 0 only
     temporal_normal = _make_temporal_states(scale=1.0)
     result = monitor.check_state_health("conv-1", conv_spike, temporal_normal, turn_number=20)
 

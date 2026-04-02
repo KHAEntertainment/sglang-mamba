@@ -1107,13 +1107,6 @@ class Scheduler(
                             )
                             if policy == "skip_snapshot":
                                 return
-                            elif policy == "kill_session":
-                                # TODO: product decision — stub for now
-                                logger.warning(
-                                    "kill_session policy not yet implemented, "
-                                    "falling back to skip_snapshot"
-                                )
-                                return
                             # else: log_and_continue — fall through to save
                 except Exception:
                     logger.error(
@@ -1679,6 +1672,11 @@ class Scheduler(
                         f"stateful_generate={stateful_generate}"
                     )
 
+                    # Reset health baselines after restore to avoid false anomalies
+                    if self.state_health_monitor is not None:
+                        self.state_health_monitor.reset_baseline(effective_conv_id)
+                        self._health_check_counter[effective_conv_id] = 0
+
                     if stateful_generate:
                         # Output will be sent after generation completes via the
                         # _stateful_generate hook in scheduler_output_processor_mixin.
@@ -1815,6 +1813,11 @@ class Scheduler(
             )
             req.origin_input_ids = metadata.fill_ids  # keep as list for downstream code
             logger.info(f"Synced fill_ids after restore, len={len(metadata.fill_ids)}")
+
+            # Reset health baselines after restore to avoid false anomalies
+            if self.state_health_monitor is not None:
+                self.state_health_monitor.reset_baseline(effective_conv_id)
+                self._health_check_counter[effective_conv_id] = 0
 
             logger.info(
                 f"Snapshot restored: conversation={recv_req.conversation_id}, "

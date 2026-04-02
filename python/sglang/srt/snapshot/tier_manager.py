@@ -81,8 +81,8 @@ def restore_latest_snapshots_to_warm_tier(
             )
         except ValueError as e:
             active_logger.warning(
-                "Quarantined snapshot for conversation %s: state validation "
-                "failed during startup restore: %s",
+                "Quarantined snapshot for conversation %s: "
+                "failed to restore during startup: %s",
                 conv_id,
                 e,
             )

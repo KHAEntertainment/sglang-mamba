@@ -150,13 +150,15 @@ The four pipeline integration points (`save_snapshot`, `load_snapshot`, `inject_
 
 ---
 
-## Future: Tier 2 Monitoring
+## Tier 2: State Health Monitoring
 
-The current checks (Tier 1) are binary pass/fail. A planned Tier 2 layer would add statistical monitoring:
+Beyond binary pass/fail (Tier 1), the `StateHealthMonitor` provides statistical anomaly detection:
 
-- **Tensor norm tracking.** Compute L2 norm of `temporal_states` after each forward pass and maintain a rolling baseline per conversation.
-- **Anomaly detection.** Flag states where the norm deviates more than 3 standard deviations from the baseline. This catches drift that does not produce NaN/Inf but is nonetheless pathological.
-- **Configurable interval.** Controlled via `--snapshot-health-check-interval N` (check every N turns). Default: disabled.
-- **Failure policy.** Two modes under consideration: `log_and_continue` (warn but proceed) vs `kill_session` (invalidate the conversation's WARM entry and force cold restore on next turn). This is a product decision — `kill_session` is safer but may surprise users with unexpected context resets.
-
-Tier 2 monitoring has no implementation in the current codebase. The `ValidationResult.warnings` list is the intended channel for surfacing Tier 2 findings without blocking inference.
+- **Per-layer norm tracking.** Computes L2 norm of each layer in `conv_states` and `temporal_states` after each forward pass, maintaining a rolling baseline per conversation via `NormBaseline`.
+- **Anomaly detection.** Flags layers where the norm deviates beyond a configurable sigma threshold (default: 3σ) from the rolling baseline. Anomalous values are excluded from the baseline to prevent poisoning.
+- **Configurable interval.** Controlled via `--snapshot-health-check-interval N` (check every N snapshots). `0` = disabled (default).
+- **Failure policy.** Two modes via `--snapshot-health-failure-policy`:
+  - `log_and_continue` (default) — log a warning and save the snapshot anyway.
+  - `skip_snapshot` — skip saving the snapshot for this turn.
+- **Scheduler integration.** Wired into the post-forward snapshot callback. Health checks gate persistence — they only run when a snapshot is about to be saved. Baselines are automatically reset after a snapshot restore to avoid false anomalies.
+- **Non-blocking.** Warnings do not block inference. The health check runs inline but its failure modes only affect snapshot persistence, never request processing.

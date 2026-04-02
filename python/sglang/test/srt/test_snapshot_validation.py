@@ -10,6 +10,7 @@ from sglang.srt.snapshot.mamba_snapshot import (
     ALLOWED_DTYPES,
     MambaSnapshotManager,
     MambaSnapshotMetadata,
+    SnapshotValidationError,
     ValidationResult,
     validate_state_tensors,
 )
@@ -292,5 +293,5 @@ def test_save_load_roundtrip_and_quarantine():
         for f in snapshot_files:
             f.write_bytes(b"corrupted data")
 
-        with pytest.raises((ValueError, Exception)):
+        with pytest.raises(SnapshotValidationError):
             manager.load_snapshot("roundtrip-conv", turn_number=0)

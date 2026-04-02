@@ -5103,6 +5103,12 @@ class ServerArgs:
         )
 
         # Mamba state persistence (snapshot system)
+        def _nonneg_int(value):
+            ivalue = int(value)
+            if ivalue < 0:
+                raise argparse.ArgumentTypeError(f"must be >= 0, got {value}")
+            return ivalue
+
         parser.add_argument(
             "--enable-snapshot-persistence",
             action="store_true",
@@ -5162,14 +5168,14 @@ class ServerArgs:
         )
         parser.add_argument(
             "--snapshot-health-check-interval",
-            type=int,
+            type=_nonneg_int,
             default=ServerArgs.snapshot_health_check_interval,
             help="Run state health check every N snapshots. 0 = disabled (default: 0).",
         )
         parser.add_argument(
             "--snapshot-health-failure-policy",
             type=str,
-            choices=["log_and_continue", "skip_snapshot", "kill_session"],
+            choices=["log_and_continue", "skip_snapshot"],
             default=ServerArgs.snapshot_health_failure_policy,
             help="Action when health anomaly detected (default: log_and_continue).",
         )
