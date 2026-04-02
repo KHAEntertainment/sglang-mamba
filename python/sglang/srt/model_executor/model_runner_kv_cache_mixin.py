@@ -192,6 +192,15 @@ class ModelRunnerKVCacheMixin:
         if self.mambaish_config is not None:
             rest_memory = self.handle_max_mamba_cache(rest_memory)
 
+        if cell_size == 0:
+            # Pure SSM model with no attention layers — the KV token pool is
+            # empty so its slot count is not the memory bottleneck.  Mamba state
+            # sizing (handle_max_mamba_cache above) is what actually bounds
+            # capacity, and _resolve_max_num_reqs enforces that limit via
+            # max_mamba_cache_size // ratio.  Return a large fixed count so the
+            # token pool allocator succeeds without wasting real memory.
+            return 1 << 20  # 1M token slots
+
         return int(rest_memory * (1 << 30)) // cell_size
 
     def handle_max_mamba_cache(self: ModelRunner, total_rest_memory):
