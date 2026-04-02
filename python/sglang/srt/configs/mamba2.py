@@ -12,6 +12,8 @@
 # limitations under the License.
 """Pure Mamba2 model configuration for standalone SSM models (e.g., Codestral Mamba 7B)."""
 
+from typing import Optional
+
 from transformers.configuration_utils import PretrainedConfig
 from transformers.utils import logging
 
@@ -49,7 +51,7 @@ class Mamba2Config(PretrainedConfig):
         conv_kernel: int = 4,
         expand: int = 2,
         n_groups: int = 8,
-        intermediate_size: int = None,
+        intermediate_size: Optional[int] = None,
         hidden_act: str = "silu",
         initializer_range: float = 0.1,
         layer_norm_epsilon: float = 1e-5,
