@@ -50,7 +50,7 @@ The gap was purely at the integration layer:
 | No model class wiring `MambaMixer2` for all layers | `models/mamba2.py` — `Mamba2ForCausalLM` following NemotronH pattern |
 | `mamba2_config` property doesn't match pure Mamba | Added `isinstance(config, Mamba2Config)` check |
 | `architectures[0]` crashes on empty list | Guards in `__init__`, `_config_draft_model`, `_derive_hybrid_model`, `is_deepseek_nsa` |
-| Division-by-zero when `cell_size = 0` | Guard in `profile_max_num_reqs` |
+| Division-by-zero when `cell_size = 0` | Guard in `profile_max_num_token` |
 
 ## Implementation Approach
 
@@ -94,7 +94,7 @@ lm_head.weight                 -> lm_head.weight
 
 ### KV Cache Profiling Fix
 
-When `full_attention_layer_ids = []`, the KV `cell_size` computes to 0 (no attention heads, no KV cache needed). This caused a division-by-zero in `profile_max_num_reqs`. Fix: when `cell_size == 0`, set it to 1 so the KV-based calculation returns a large value, letting `handle_max_mamba_cache()` be the real constraint on request capacity.
+When `full_attention_layer_ids = []`, the KV `cell_size` computes to 0 (no attention heads, no KV cache needed). This caused a division-by-zero in `profile_max_num_token`. Fix: when `cell_size == 0`, detect this as a special SSM-only case and compute token capacity using a bounded estimate based on the model's context length and available memory after Mamba state allocation, rather than relying on the KV-based calculation. This ensures `handle_max_mamba_cache()` properly constrains request capacity.
 
 ## Upstream Contribution Path
 

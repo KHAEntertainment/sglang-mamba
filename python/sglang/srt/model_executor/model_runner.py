@@ -537,10 +537,13 @@ class ModelRunner(ModelRunnerKVCacheMixin):
                 self.model_config.num_attention_layers,
             )
         )
-        if self.model_config.hf_config.architectures[0] == "MiMoV2MTP":
-            model_num_layers = 1
-        elif self.model_config.hf_config.architectures[0] == "Step3p5MTP":
-            model_num_layers = 1
+        # Check architectures safely for pure SSM/Mamba models that may not have it
+        architectures = getattr(self.model_config.hf_config, "architectures", None)
+        if architectures and len(architectures) > 0:
+            if architectures[0] == "MiMoV2MTP":
+                model_num_layers = 1
+            elif architectures[0] == "Step3p5MTP":
+                model_num_layers = 1
         self.start_layer = getattr(self.model, "start_layer", 0)
         self.end_layer = getattr(self.model, "end_layer", model_num_layers)
         self.num_effective_layers = self.end_layer - self.start_layer

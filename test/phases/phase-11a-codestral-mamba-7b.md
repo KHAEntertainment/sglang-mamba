@@ -87,6 +87,7 @@ python -m sglang.launch_server \
   --model-path $CODESTRAL_MODEL_PATH \
   --enable-snapshot-persistence \
   --snapshot-dir /tmp/codestral-snapshots \
+  --mamba-scheduler-strategy no_buffer \
   --disable-radix-cache \
   --port $CODESTRAL_PORT \
   2>&1 | tee results/compat-codestral-gate3.log

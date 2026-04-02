@@ -106,6 +106,11 @@ class Mamba2Config(PretrainedConfig):
         self.norm_before_gate = norm_before_gate
         self.chunk_size = chunk_size
 
+        # Compatibility aliases for ModelConfig.get_num_kv_heads() and
+        # other code paths expecting attention-related attributes
+        self.num_attention_heads = self.num_heads
+        self.num_kv_heads = 0  # Pure SSM has no KV heads
+
         super().__init__(
             pad_token_id=pad_token_id,
             bos_token_id=bos_token_id,
@@ -113,6 +118,16 @@ class Mamba2Config(PretrainedConfig):
             tie_word_embeddings=tie_word_embeddings,
             **kwargs,
         )
+
+        # Mirror num_attention_heads onto hf_text_config after parent init
+        # so older code paths (ModelConfig.get_num_kv_heads(), hf_text_config)
+        # find the expected attributes even when cell_size == 0
+        if not hasattr(self, 'hf_text_config'):
+            # Create a minimal hf_text_config if it doesn't exist
+            class HFTextConfig:
+                pass
+            self.hf_text_config = HFTextConfig()
+        self.hf_text_config.num_attention_heads = self.num_attention_heads
 
     @property
     def layers_block_type(self):

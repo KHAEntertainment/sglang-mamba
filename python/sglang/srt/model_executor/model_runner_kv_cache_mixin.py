@@ -165,15 +165,30 @@ class ModelRunnerKVCacheMixin:
             num_layers = self.num_effective_layers
 
         cell_size = self.get_cell_size_per_token(num_layers)
-        if cell_size == 0:
-            # Pure SSM model with no attention layers — KV cache is not the
-            # limiting factor.  Mamba cache sizing (handle_max_mamba_cache)
-            # governs request capacity instead.
-            cell_size = 1
 
         rest_memory = post_model_load_memory - pre_model_load_memory * (
             1 - self.mem_fraction_static
         )
+
+        if cell_size == 0:
+            # Pure SSM model with no attention layers — KV cache is not the
+            # limiting factor. Compute token capacity based on Mamba state
+            # constraints instead.
+            if self.mambaish_config is not None:
+                # Call handle_max_mamba_cache to compute max_mamba_cache_size
+                rest_memory = self.handle_max_mamba_cache(rest_memory)
+                # For pure SSM, token capacity is bounded by the context length
+                # and available memory. Use a conservative estimate based on
+                # the model's context length as the per-request token budget.
+                max_tokens_per_req = self.model_config.context_len
+                # Compute how many such requests fit in available memory
+                # (rest_memory is in GB, convert to bytes)
+                return int(rest_memory * (1 << 30) // (max_tokens_per_req * 2))  # 2 bytes per token for bf16 activations
+            else:
+                # Fallback: if no Mamba config, use available memory with a
+                # conservative per-token estimate
+                return int(rest_memory * (1 << 30) // 2)
+
         if self.mambaish_config is not None:
             rest_memory = self.handle_max_mamba_cache(rest_memory)
 
