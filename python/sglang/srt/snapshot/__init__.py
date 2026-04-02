@@ -24,9 +24,19 @@ Key Components:
 from sglang.srt.snapshot.mamba_snapshot import (
     MambaSnapshotManager,
     MambaSnapshotMetadata,
+    SnapshotValidationError,
     ValidationResult,
     validate_state_tensors,
 )
+
+__all__ = [
+    # Phase 2: Core snapshots
+    "MambaSnapshotManager",
+    "MambaSnapshotMetadata",
+    "SnapshotValidationError",
+    "ValidationResult",
+    "validate_state_tensors",
+]
 
 try:
     from sglang.srt.snapshot.conversation_tracker import (
@@ -37,24 +47,23 @@ try:
     from sglang.srt.snapshot.mamba_host_pool import HostPoolEntry, MambaHostPool
     from sglang.srt.snapshot.snapshot_hooks import SnapshotHookManager
     from sglang.srt.snapshot.snapshot_policy import SnapshotRetentionPolicy
+    from sglang.srt.snapshot.state_health import HealthCheckResult, StateHealthMonitor
     from sglang.srt.snapshot.tier_manager import TierManager
+
+    __all__.extend([
+        "SnapshotHookManager",
+        "SnapshotRetentionPolicy",
+        # Phase 2.5: Memory tiers
+        "MambaHostPool",
+        "HostPoolEntry",
+        "ConversationTracker",
+        "ConversationTier",
+        "ConversationState",
+        "TierManager",
+        # Tier 2: State health monitoring
+        "StateHealthMonitor",
+        "HealthCheckResult",
+    ])
 except ImportError:
     # Allow partial imports during development
     pass
-
-__all__ = [
-    # Phase 2: Core snapshots
-    "MambaSnapshotManager",
-    "MambaSnapshotMetadata",
-    "ValidationResult",
-    "validate_state_tensors",
-    "SnapshotHookManager",
-    "SnapshotRetentionPolicy",
-    # Phase 2.5: Memory tiers
-    "MambaHostPool",
-    "HostPoolEntry",
-    "ConversationTracker",
-    "ConversationTier",
-    "ConversationState",
-    "TierManager",
-]

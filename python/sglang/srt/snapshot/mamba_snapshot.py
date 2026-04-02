@@ -17,6 +17,11 @@ from safetensors.torch import load_file, save_file
 logger = logging.getLogger(__name__)
 
 
+class SnapshotValidationError(ValueError):
+    """Raised when snapshot state fails validation checks."""
+    pass
+
+
 @dataclass
 class MambaSnapshotMetadata:
     """
@@ -501,7 +506,7 @@ class MambaSnapshotManager:
                 f"{'; '.join(result.errors)}"
             )
             logger.error(error_msg)
-            raise ValueError(error_msg)
+            raise SnapshotValidationError(error_msg)
         for w in result.warnings:
             logger.warning(f"State validation warning (load): {w}")
 

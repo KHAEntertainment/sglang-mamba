@@ -10,6 +10,7 @@ from sglang.srt.snapshot.mamba_snapshot import (
     ALLOWED_DTYPES,
     MambaSnapshotManager,
     MambaSnapshotMetadata,
+    SnapshotValidationError,
     ValidationResult,
     validate_state_tensors,
 )
@@ -254,3 +255,43 @@ def test_validation_result_bool():
     invalid = ValidationResult(is_valid=False, warnings=[], errors=["something wrong"])
     assert bool(valid) is True
     assert bool(invalid) is False
+
+
+# ---------------------------------------------------------------------------
+# 15. E2E: save → load → restore round-trip and quarantine on corruption
+# ---------------------------------------------------------------------------
+
+def test_save_load_roundtrip_and_quarantine():
+    """Save a valid snapshot, load it back, and verify quarantine on corruption."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        manager = MambaSnapshotManager(Path(tmp_dir))
+        metadata = _make_metadata(conversation_id="roundtrip-conv")
+
+        conv = _make_conv_states()
+        temporal = _make_temporal_states()
+
+        # Save should succeed
+        manager.save_snapshot(conv, temporal, metadata)
+
+        # Load should succeed and return valid state
+        loaded = manager.load_snapshot("roundtrip-conv", turn_number=0)
+        assert loaded is not None
+        loaded_conv, loaded_temporal, loaded_meta = loaded
+        assert len(loaded_conv) == len(conv)
+        assert loaded_temporal.shape == temporal.shape
+        assert loaded_meta.conversation_id == "roundtrip-conv"
+
+        # Verify loaded state passes validation
+        result = validate_state_tensors(loaded_conv, loaded_temporal)
+        assert result.is_valid is True
+
+        # Now corrupt the file on disk and verify load raises ValueError
+        conv_dir = Path(tmp_dir) / "roundtrip-conv"
+        snapshot_files = list(conv_dir.glob("*.safetensors"))
+        assert len(snapshot_files) > 0
+        # Overwrite with garbage to trigger deserialization or validation failure
+        for f in snapshot_files:
+            f.write_bytes(b"corrupted data")
+
+        with pytest.raises(SnapshotValidationError):
+            manager.load_snapshot("roundtrip-conv", turn_number=0)

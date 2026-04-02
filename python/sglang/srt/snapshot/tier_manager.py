@@ -81,8 +81,8 @@ def restore_latest_snapshots_to_warm_tier(
             )
         except ValueError as e:
             active_logger.warning(
-                "Quarantined snapshot for conversation %s: state validation "
-                "failed during startup restore: %s",
+                "Quarantined snapshot for conversation %s: "
+                "failed to restore during startup: %s",
                 conv_id,
                 e,
             )
@@ -129,6 +129,7 @@ class TierManager:
         snapshot_manager: MambaSnapshotManager,
         enable_background_cleanup: bool = True,
         cleanup_interval: float = 60.0,  # Check every 60 seconds
+        model_path: Optional[str] = None,
     ):
         """
         Initialize tier manager.
@@ -139,11 +140,13 @@ class TierManager:
             snapshot_manager: Snapshot manager
             enable_background_cleanup: Run background cleanup thread
             cleanup_interval: Seconds between cleanup checks
+            model_path: Running model path for compatibility checks on restore
         """
         self.conversation_tracker = conversation_tracker
         self.host_pool = host_pool
         self.snapshot_manager = snapshot_manager
         self.cleanup_interval = cleanup_interval
+        self.model_path = model_path
 
         # Thread safety
         self._lock = threading.RLock()
@@ -266,6 +269,21 @@ class TierManager:
             if result:
                 conv_states, temporal_states, metadata = result
 
+                # Model compatibility check
+                model_name = (
+                    metadata.get("model_name") if isinstance(metadata, dict)
+                    else getattr(metadata, "model_name", None)
+                )
+                if (
+                    self.model_path
+                    and model_name
+                    and model_name != self.model_path
+                ):
+                    raise ValueError(
+                        f"Model mismatch: snapshot from '{model_name}', "
+                        f"server running '{self.model_path}'"
+                    )
+
                 # Mark as accessed
                 self.conversation_tracker.mark_accessed(conversation_id)
 
@@ -305,6 +323,17 @@ class TierManager:
                     self.snapshot_manager.load_snapshot(conversation_id, turn_number)
                 )
 
+                # Model compatibility check
+                if (
+                    self.model_path
+                    and metadata.model_name
+                    and metadata.model_name != self.model_path
+                ):
+                    raise ValueError(
+                        f"Model mismatch: snapshot from '{metadata.model_name}', "
+                        f"server running '{self.model_path}'"
+                    )
+
                 # Mark as accessed
                 self.conversation_tracker.mark_accessed(conversation_id)
 
@@ -314,6 +343,8 @@ class TierManager:
 
                 return conv_states, temporal_states, metadata
 
+            except ValueError:
+                raise  # Let validation errors propagate for quarantine
             except Exception as e:
                 logger.error(f"Failed to restore from COLD tier: {e}", exc_info=True)
                 return None
