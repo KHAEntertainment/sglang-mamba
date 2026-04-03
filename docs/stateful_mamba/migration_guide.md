@@ -1,453 +1,171 @@
-# Migration Guide: Enabling Stateful Mamba Snapshots
+# Migration Guide: Adopt Engram Snapshot Statefulness
 
-> **⚠️ Implementation Status:** Phase 1 (Snapshot Saving) is complete. Phase 2 (State Restoration) is in development.
->
-> **Available Now:** `save_snapshot()`, `list_snapshots()`, `SnapshotManager` class (for restore/get_info)
-> **Coming Soon:** Direct state object methods `s.restore_snapshot()`, `s.get_snapshot_info()`
+This guide explains how to move from ordinary Mamba serving to the current
+Engram snapshot workflow in this repository.
 
-This guide helps you enable and integrate snapshot features into existing SGLang applications.
+It reflects the implementation that exists today. It does not describe the
+older Phase 1 / Phase 2 planning model.
 
-## Table of Contents
+## What Changes
 
-- [Overview](#overview)
-- [Prerequisites](#prerequisites)
-- [Phase 1 Migration](#phase-1-migration)
-- [Phase 1 Usage Examples](#phase-1-usage-examples)
-- [Phase 2 Preview](#phase-2-preview)
-- [Breaking Changes](#breaking-changes)
-- [Performance Impact](#performance-impact)
+Before Engram usage:
 
-## Overview
+- requests are served normally
+- clients resend full context on each turn
+- no snapshot catalog is managed by the client
 
-The snapshot system is **fully backward compatible**. Existing code continues to work without modification when snapshots are disabled (the default). This guide shows you how to **opt-in** to Phase 1 snapshot features.
+With Engram usage:
 
-### Key Points
+- the server is started with snapshot persistence enabled
+- clients save snapshots after important turns
+- clients track `conversation_id` plus `turn_number` or `branch_name`
+- later turns can use restore-and-generate flows instead of replaying all prior
+  tokens
 
-- **Zero Breaking Changes**: All existing code works unchanged
-- **Opt-in Feature**: Must be explicitly enabled
-- **Phase 1 Only**: Currently supports snapshot saving and inspection only
-- **No Performance Penalty**: Zero overhead when disabled
-- **Transformer Models Unaffected**: This is Mamba-specific
-
-## Prerequisites
-
-### Version Requirements
-
-- **SGLang**: Latest version with Phase 1 snapshot support
-- **Python**: 3.8+
-- **Model**: Mamba or Mamba2 architecture
-- **GPU**: CUDA-capable GPU with sufficient memory
-
-### Check Your Version
-
-```python
-import sglang
-print(f"SGLang version: {sglang.__version__}")
-```
-
-### Memory Requirements
-
-Snapshots consume additional disk space for persistence:
-- Typically 50-100 MB per snapshot for Mamba-2.8B
-- Varies by model size and sequence length
-- Snapshots are saved to disk, not held in memory long-term
-
-## Phase 1 Migration
-
-### Step 1: Update SGLang
+## Step 1: Enable Snapshot Persistence On The Server
 
 ```bash
-# Update to latest version
-pip install --upgrade sglang
-
-# Or install from source
-git clone https://github.com/sgl-project/sglang.git
-cd sglang
-pip install -e "python[all]"
+python -m sglang.launch_server \
+  --model-path /workspace/models/granite-4.0-h-small \
+  --host 0.0.0.0 \
+  --port 30000 \
+  --enable-snapshot-persistence \
+  --snapshot-dir /workspace/snapshots \
+  --trust-remote-code
 ```
 
-### Step 2: Enable Snapshots
+Recommended production shape:
 
-#### Before (without snapshots)
+```bash
+python -m sglang.launch_server \
+  --model-path /workspace/models/granite-4.0-h-small \
+  --host 0.0.0.0 \
+  --port 30000 \
+  --enable-snapshot-persistence \
+  --snapshot-dir /workspace/snapshots \
+  --admin-api-key "$SGLANG_ADMIN_KEY" \
+  --trust-remote-code
+```
+
+## Step 2: Decide Your Snapshot Keys
+
+You need a durable selection strategy.
+
+Recommended default:
+
+- `conversation_id`: your stable chat/session key
+- `turn_number`: your main-line turn counter
+- `branch_name`: only when intentionally branching
+
+Do not build your client around a legacy “restore by snapshot id only” mental
+model. The live API is selector-based.
+
+## Step 3: Save Snapshots After Important Turns
+
+Typical pattern:
+
+1. generate through `/v1/chat/completions`
+2. keep the resulting `rid`
+3. call `/save_snapshot` with that `rid`
+4. persist your own `conversation_id` and `turn_number`
+
+Example:
 
 ```python
-from sglang import Runtime
-
-runtime = Runtime(
-    model_path="state-spaces/mamba-2.8b"
+save_resp = requests.post(
+    "http://localhost:30000/save_snapshot",
+    json={
+        "rid": rid,
+        "conversation_id": "chat-123",
+        "turn_number": 3,
+    },
+    timeout=30,
 )
+save_body = save_resp.json()
 ```
 
-#### After (with snapshots enabled)
+## Step 4: Inspect The Snapshot Catalog
+
+Use:
+
+- `/list_snapshots` to inspect everything in a conversation
+- `/get_snapshot_info` to inspect one selected snapshot
+
+Remember:
+
+- empty conversations currently return `snapshots: []`
+- for info/delete flows, one of `turn_number` or `branch_name` is effectively
+  required in practice
+
+## Step 5: Migrate Later Turns To Restore-And-Generate
+
+For stateful continuation:
+
+1. tokenize only the new user turn
+2. call `/restore_snapshot` with `create_new_request=true`
+3. pass `continuation_ids` and `max_new_tokens`
+4. read `output_text` from the response
+
+Example:
 
 ```python
-from sglang import Runtime
-import os
-
-# Create snapshot directory
-os.makedirs("./my_snapshots", exist_ok=True)
-
-runtime = Runtime(
-    model_path="state-spaces/mamba-2.8b",
-    enable_snapshot_persistence=True,  # Enable snapshots
-    snapshot_dir="./my_snapshots"
+restore_resp = requests.post(
+    "http://localhost:30000/restore_snapshot",
+    json={
+        "conversation_id": "chat-123",
+        "create_new_request": True,
+        "continuation_ids": continuation_ids,
+        "max_new_tokens": 80,
+    },
+    timeout=120,
 )
+restore_body = restore_resp.json()
 ```
 
-### Step 3: Update Your Code to Use Snapshots
+## Python Surface Changes
 
-#### Before (standard inference)
+The current direct surface on `s` is:
 
-```python
-from sglang import function, gen
+- `save_snapshot`
+- `list_snapshots`
+- `get_snapshot_info`
+- `restore_snapshot`
+- `delete_snapshot`
 
-@function
-def my_function(s, prompt):
-    s += prompt
-    s += gen("response", max_tokens=100)
-    return s
-
-result = my_function.run(prompt="Hello", runtime=runtime)
-```
-
-#### After (with snapshot support - Phase 1)
+The current high-level manager is:
 
 ```python
-from sglang import function, gen
-
-@function
-def my_function(s, prompt):
-    s += prompt
-    s += gen("response", max_tokens=100)
-
-    # Save snapshot (new feature)
-    snapshot_id = s.save_snapshot()
-
-    # List all snapshots
-    snapshots = s.list_snapshots()
-    print(f"Total snapshots: {len(snapshots)}")
-
-    # Get snapshot info (Phase 2 - use SnapshotManager for now)
-    # NOTE: s.get_snapshot_info() is not yet available as a direct method
-    # Use SnapshotManager instead:
-    # sm = sgl.SnapshotManager(runtime.endpoint)
-    # info = sm.get_info(conversation_id=s.stream_executor.sid, turn_number=0)
-    # print(f"Snapshot metadata: {info}")
-
-    return s
-
-result = my_function.run(prompt="Hello", runtime=runtime)
-```
-
-### Step 4: Test the Migration
-
-```python
-# Test basic snapshot operations
-@function
-def test_snapshots(s):
-    # Basic generation
-    s += "Test: "
-    s += gen("test1", max_tokens=10)
-
-    # Save snapshot
-    try:
-        snap_id = s.save_snapshot()
-        print(f"✓ Snapshot saved: {snap_id}")
-    except Exception as e:
-        print(f"✗ Snapshot save failed: {e}")
-        return s
-
-    # List snapshots
-    try:
-        snapshots = s.list_snapshots()
-        print(f"✓ Found {len(snapshots)} snapshots")
-    except Exception as e:
-        print(f"✗ List snapshots failed: {e}")
-
-    # Get snapshot info
-    try:
-        info = s.get_snapshot_info(
-            conversation_id=s.stream_executor.sid,
-            turn_number=0
-        )
-        print(f"✓ Snapshot info retrieved: {info}")
-    except Exception as e:
-        print(f"✗ Get snapshot info failed: {e}")
-
-    return s
-
-result = test_snapshots.run(runtime=runtime)
-```
-
-## Compatibility Matrix
-
-| Feature | Snapshots Disabled | Phase 1 (Current) | Phase 2 (Coming) |
-|---------|-------------------|-------------------|------------------|
-| Standard Mamba inference | ✓ | ✓ | ✓ |
-| Transformer models | ✓ | ✓ | ✓ |
-| Radix cache | ✓ | ✓ | ✓ |
-| Multi-turn conversations | ✓ | ✓ | ✓ (better) |
-| `save_snapshot()` | ✗ | ✓ | ✓ |
-| `list_snapshots()` | ✗ | ✓ | ✓ |
-| `get_snapshot_info()` | ✗ | ✓ | ✓ |
-| `restore_snapshot()` | ✗ | ✗ | ✓ |
-| `SnapshotManager` | ✗ | ✓ | ✓ |
-| Disk persistence | ✗ | ✓ | ✓ |
-
-## Phase 1 Usage Examples
-
-### Example 1: Basic Snapshot Saving
-
-```python
-from sglang import function, gen, Runtime
-
-@function
-def stateful_chat(s):
-    s += "User: " + s["user_input"] + "\n"
-    s += "Assistant: " + gen("response", max_tokens=100)
-
-    # Save snapshot with auto-generated ID
-    snap_id = s.save_snapshot()
-    print(f"Saved snapshot: {snap_id}")
-
-    # Or with custom conversation tracking
-    snap_id = s.save_snapshot(
-        conversation_id="user_123_session",
-        turn_number=1
-    )
-
-    return s
-
-runtime = Runtime(
-    model_path="state-spaces/mamba-2.8b",
-    enable_snapshot_persistence=True,
-    snapshot_dir="./snapshots"
-)
-
-result = stateful_chat.run(user_input="Hello!", runtime=runtime)
-```
-
-### Example 2: Listing and Inspecting Snapshots
-
-```python
-from sglang import function, gen
-
-@function
-def inspect_snapshots(s):
-    # Generate some content with multiple turns
-    for i in range(3):
-        s += f"Turn {i}: "
-        s += gen(f"response_{i}", max_tokens=50)
-        s.save_snapshot()
-
-    # List all snapshots for current conversation
-    snapshots = s.list_snapshots()
-    print(f"Total snapshots: {len(snapshots)}")
-
-    for snap in snapshots:
-        print(f"Turn {snap['turn_number']}: {snap['token_count']} tokens")
-        print(f"Timestamp: {snap['timestamp']}")
-        print(f"Conversation ID: {snap['conversation_id']}")
-
-    # Get detailed info about a specific snapshot
-    if snapshots:
-        info = s.get_snapshot_info(
-            conversation_id=snapshots[0]['conversation_id'],
-            turn_number=snapshots[0]['turn_number']
-        )
-        print(f"Detailed info: {info}")
-
-    return s
-
-result = inspect_snapshots.run(runtime=runtime)
-```
-
-### Example 3: Tracking Conversation Progress
-
-```python
-from sglang import function, gen
-
-@function
-def multi_turn_conversation(s):
-    turns = [
-        "What is machine learning?",
-        "Can you give an example?",
-        "How does it differ from traditional programming?"
-    ]
-
-    for i, user_msg in enumerate(turns):
-        s += f"User: {user_msg}\n"
-        s += "Assistant: " + gen(f"response_{i}", max_tokens=100)
-
-        # Save snapshot after each turn
-        snap_id = s.save_snapshot(
-            conversation_id="ml_conversation",
-            turn_number=i
-        )
-        print(f"Saved turn {i} as snapshot {snap_id}")
-
-    # After conversation, inspect all snapshots
-    all_snapshots = s.list_snapshots()
-    print(f"\nConversation had {len(all_snapshots)} turns")
-
-    # Examine growth over time
-    for snap in all_snapshots:
-        info = s.get_snapshot_info(
-            conversation_id=snap['conversation_id'],
-            turn_number=snap['turn_number']
-        )
-        print(f"Turn {snap['turn_number']}: {info['token_count']} tokens")
-
-    return s
-
-result = multi_turn_conversation.run(runtime=runtime)
-```
-
-## Phase 2 Preview
-
-Phase 2 will add state restoration and advanced snapshot management. Here's a preview of what's coming:
-
-```python
-# Phase 2: Coming Soon
-from sglang import function, gen
 from sglang.snapshot import SnapshotManager
 
-@function
-def chat_with_restoration(s):
-    # First turn
-    s += "User: Hello\n"
-    s += "Assistant: " + gen("response1", max_tokens=100)
-    snap_id = s.save_snapshot()
-
-    # Second turn
-    s += "\nUser: Tell me more\n"
-    s += "Assistant: " + gen("response2", max_tokens=100)
-
-    # Restore to first turn (Phase 2 feature - not yet available as direct method)
-    # NOTE: s.restore_snapshot() is not yet available
-    # Use SnapshotManager instead (see below)
-
-    # Continue from restored state (without actual restore in Phase 1)
-    s += "\nUser: Actually, tell me something else\n"
-    s += "Assistant: " + gen("response3", max_tokens=100)
-
-    return s
-
-# SnapshotManager class (Available Now!)
-from sglang import SnapshotManager
 manager = SnapshotManager(runtime.endpoint)
-# List snapshots for a conversation
-snapshots = manager.list_conversation(conversation_id="conv_123")
-# Get snapshot metadata
-info = manager.get_info(conversation_id="conv_123", turn_number=5)
-# Restore a snapshot
-manager.restore(rid="req_123", conversation_id="conv_123", turn_number=5)
-# Delete a snapshot
-manager.delete(conversation_id="conv_123", turn_number=5)
 ```
 
-## Breaking Changes
+Available manager methods:
 
-**None.** The snapshot system is fully backward compatible.
+- `list_conversation`
+- `get_info`
+- `restore`
+- `delete`
 
-### Disk Usage
+## Behavior Differences Worth Noting
 
-Snapshots are persisted to disk:
-- Each snapshot: ~50-100 MB for Mamba-2.8B
-- Ensure adequate disk space in snapshot directory
-- Consider cleanup strategies for long-running applications
-
-## Performance Impact
-
-### When Snapshots Are Disabled (default)
-
-- **Overhead**: Zero
-- **Disk**: No change
-- **Performance**: Identical to baseline
-
-### When Snapshots Are Enabled (Phase 1)
-
-- **Save Operation**: Fast I/O operation to write to disk
-- **Overhead**: Minimal during inference
-- **Disk**: ~50-100 MB per snapshot (varies by model)
-
-### Benchmark Comparison
-
-```python
-import time
-from sglang import function, gen, Runtime
-
-# Without snapshots
-runtime_baseline = Runtime(model_path="state-spaces/mamba-2.8b")
-
-@function
-def without_snapshots(s):
-    for i in range(10):
-        s += gen(f"text_{i}", max_tokens=50)
-    return s
-
-start = time.time()
-result = without_snapshots.run(runtime=runtime_baseline)
-time_baseline = time.time() - start
-print(f"Without snapshots: {time_baseline:.2f}s")
-
-# With snapshots enabled
-runtime_snapshots = Runtime(
-    model_path="state-spaces/mamba-2.8b",
-    enable_snapshot_persistence=True,
-    snapshot_dir="./snapshots"
-)
-
-start = time.time()
-result = without_snapshots.run(runtime=runtime_snapshots)
-time_enabled = time.time() - start
-print(f"With snapshots (not used): {time_enabled:.2f}s")
-print(f"Overhead: {(time_enabled - time_baseline) / time_baseline * 100:.2f}%")
-
-# Actively saving snapshots
-@function
-def with_snapshots(s):
-    for i in range(10):
-        s += gen(f"text_{i}", max_tokens=50)
-        s.save_snapshot()
-    return s
-
-start = time.time()
-result = with_snapshots.run(runtime=runtime_snapshots)
-time_with_saves = time.time() - start
-print(f"With snapshot saves: {time_with_saves:.2f}s")
-print(f"Save overhead: {(time_with_saves - time_baseline) / time_baseline * 100:.2f}%")
-```
+- `/save_snapshot` can fail but still return HTTP `200`
+- `/restore_snapshot` returns HTTP `500` when `success=false`
+- restore-only really works best with a live `rid`
+- conversation-only restore can report state availability without injecting into
+  a live request
 
 ## Migration Checklist
 
-Use this checklist when migrating to snapshot-enabled inference:
+- server launched with `--enable-snapshot-persistence`
+- snapshot directory is writable
+- client owns a stable `conversation_id`
+- client tracks `turn_number` or `branch_name`
+- client uses the same tokenizer/template for restore-and-generate
+- client checks response JSON for `success`
 
-- [ ] Upgrade SGLang to latest version with Phase 1 support
-- [ ] Check model compatibility (Mamba/Mamba2 only)
-- [ ] Create snapshot directory
-- [ ] Ensure adequate disk space
-- [ ] Enable snapshots in runtime config
-- [ ] Update code to use snapshot operations (optional)
-- [ ] Test snapshot save/list/info operations
-- [ ] Monitor disk usage
-- [ ] Plan cleanup strategy for old snapshots
-- [ ] Update documentation for your application
+## Next Reading
 
-## Getting Help
-
-If you encounter issues during migration:
-
-- **Documentation**: [Troubleshooting Guide](troubleshooting.md)
-- **GitHub Issues**: [Report bugs](https://github.com/sgl-project/sglang/issues)
-- **Discussions**: [Ask questions](https://github.com/sgl-project/sglang/discussions)
-- **Slack**: [Join community](https://slack.sglang.io/)
-
-## Next Steps
-
-After successful migration:
-
-- Read the [User Guide](user_guide.md) for best practices
-- Explore [Examples](examples.md) for real-world patterns
-- Review [API Reference](api_reference.md) for detailed documentation
-- Learn about [Architecture](architecture.md) for advanced usage
+- [http_api_spec.md](http_api_spec.md) for the canonical wire contract
+- [user_guide.md](user_guide.md) for the current high-level usage model
+- [troubleshooting.md](troubleshooting.md) for the most common failure modes

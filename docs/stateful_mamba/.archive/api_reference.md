@@ -1,4 +1,12 @@
-# Stateful Mamba API Reference
+# ARCHIVAL ONLY: Stateful Mamba API Reference
+
+> [!WARNING]
+> This document is retained for historical reference only and does not reflect
+> the current production API surface.
+>
+> Do not use this file for implementation, integration, or product decisions.
+> Use [`../http_api_spec.md`](../http_api_spec.md) as the canonical HTTP API
+> reference.
 
 Complete API documentation for the snapshot system in SGLang.
 

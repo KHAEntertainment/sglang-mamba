@@ -1,288 +1,163 @@
-# Troubleshooting Guide: Stateful Mamba Snapshots
+# Engram Troubleshooting
 
-> **⚠️ Implementation Status:** Two API surfaces are available for snapshot operations.
->
-> **Direct state methods (available now):** `s.save_snapshot()`, `s.list_snapshots()`
-> **Direct state methods (coming soon):** `s.restore_snapshot()`, `s.get_snapshot_info()`
-> **SnapshotManager methods (available now):** `SnapshotManager.restore()`, `SnapshotManager.get_info()`, `SnapshotManager.delete()`
+This guide covers the failure modes most likely to confuse integrators working
+with the current Engram snapshot implementation.
 
-Common issues and solutions for the snapshot system.
+For the exact request and response contract, use
+[http_api_spec.md](http_api_spec.md).
 
-## Table of Contents
+## Snapshot Save Failed But HTTP Status Was 200
 
-- [Current Limitations](#current-limitations)
-- [Common Issues](#common-issues)
-- [Error Messages](#error-messages)
-- [Memory Problems](#memory-problems)
-- [FAQ](#faq)
+Symptom:
 
-## Current Limitations
+- `/save_snapshot` returned HTTP `200`
+- the body still says `success: false`
 
-Snapshot operations use two API surfaces: direct state methods for save/list, and `SnapshotManager` for restore/get_info/delete.
+Cause:
 
-**What works now:**
-- ✅ `s.save_snapshot()` - Save current state (direct state method)
-- ✅ `s.list_snapshots()` - List saved snapshots (direct state method)
-- ✅ `SnapshotManager(runtime.endpoint).restore(snapshot_id)` - Restore a snapshot
-- ✅ `SnapshotManager(runtime.endpoint).get_info(snapshot_id)` - Get snapshot metadata
-- ✅ `SnapshotManager(runtime.endpoint).delete(snapshot_id)` - Delete a snapshot
+- the route currently returns HTTP `200` for handler-level save failures
 
-**What doesn't work yet:**
-- ❌ `s.restore_snapshot()` - Direct state method for restoring snapshots (use SnapshotManager.restore() instead)
-- ❌ `s.get_snapshot_info()` - Direct state method for querying snapshot metadata (use SnapshotManager.get_info() instead)
-- ❌ Automatic snapshot management (retention policies, lifecycle hooks)
+What to do:
 
-## Common Issues
+- always parse the response body
+- treat `success` as authoritative
+- log the returned message
 
-### Issue: "Backend does not support snapshots"
+## Restore Failed And Returned HTTP 500
 
-**Symptom**: Getting an error that snapshots are not supported when calling `save_snapshot()`.
+Symptom:
 
-**Cause**: The runtime wasn't started with snapshot support enabled.
+- `/restore_snapshot` returned HTTP `500`
+- the body still includes a structured JSON failure payload
 
-**Solution**:
+Cause:
 
-```python
-# Wrong - this parameter doesn't exist
-runtime = Runtime(enable_mamba_snapshots=True)  # ❌
+- the route maps application-level restore failure to HTTP `500`
 
-# Correct - use this parameter
-runtime = Runtime(enable_snapshot_persistence=True)  # ✅
-```
+What to do:
 
-Or via command line:
-```bash
-# Wrong
-python -m sglang.launch_server --enable-mamba-snapshots  # ❌
+- do not rely on `raise_for_status()` alone
+- parse the body and inspect `success` plus `message`
 
-# Correct
-python -m sglang.launch_server --enable-snapshot-persistence  # ✅
-```
+## Restore-Only Did Not Inject State
 
----
+Symptom:
 
-### Issue: Snapshot Not Found
+- restore-only call succeeds
+- response says state is available for future requests
+- expected in-place restore did not happen
 
-**Symptom**: `list_snapshots()` returns an empty list or a snapshot you expect to be there is missing.
+Cause:
 
-**Cause**: Snapshot wasn't saved, or wrong conversation_id used.
+- restore-only is effectively a live-request operation
+- without a resolvable live `rid`, the server may locate snapshot state but not
+  inject it into a running request
 
-**Solution**:
+What to do:
 
-```python
-# List all snapshots to see what's available
-snapshots = s.list_snapshots()
-for snap in snapshots:
-    print(f"Turn: {snap['turn_number']}, Tokens: {snap['token_count']}")
+- use a live `rid` for restore-only flows
+- for later-turn inference, prefer restore-and-generate with
+  `create_new_request=true`
 
-# Ensure save_snapshot() was called before listing
-snap_id = s.save_snapshot()
-snapshots = s.list_snapshots()
-print(f"Saved snap_id={snap_id}, total={len(snapshots)}")
-```
+## `get_snapshot_info` Or `delete_snapshot` Fails With Selectors That Look Optional
 
-> **Note:** To query individual snapshot metadata, use `SnapshotManager(runtime.endpoint).get_info(snapshot_id)`. Direct state method `s.get_snapshot_info()` is coming soon.
+Symptom:
 
----
+- request model suggests `turn_number` and `branch_name` are optional
+- runtime still fails when both are omitted
 
-### Issue: Slow Snapshot Operations
+Cause:
 
-**Symptom**: `save_snapshot()` is slow.
+- the lower snapshot path logic effectively needs one of those selectors
 
-**Diagnosis**:
+What to do:
 
-```python
-import time
+- always send either `turn_number` or `branch_name`
 
-@function
-def benchmark_snapshot(s):
-    s += gen("text", max_tokens=100)
+## Empty Snapshot List
 
-    # Benchmark save
-    start = time.time()
-    snap_id = s.save_snapshot()
-    save_time = time.time() - start
-    print(f"Save time: {save_time*1000:.2f}ms")
+Symptom:
 
-    return s
-```
+- `/list_snapshots` returns `success: true`
+- `snapshots` is an empty list
 
-**Solutions**:
+Cause:
 
-1. **Check for disk I/O bottleneck**: Ensure snapshot directory is on fast storage (SSD)
+- current behavior for nonexistent or empty conversations is a successful empty
+  response, not an application error
 
-2. **Reduce snapshot frequency**:
+What to do:
 
-```python
-# Don't create snapshots too frequently
-@function
-def efficient_snapshots(s):
-    for i in range(100):
-        s += gen(f"text_{i}", max_tokens=10)
-        # Only snapshot every 10 iterations
-        if i % 10 == 0:
-            s.save_snapshot()
-    return s
-```
+- treat `[]` as “no snapshots found yet”
+- verify that your `conversation_id` matches the one used during save
 
----
+## Restore-And-Generate Fails Validation
 
-## Error Messages
+Symptom:
 
-### "Snapshot directory does not exist"
+- `/restore_snapshot` fails before useful generation starts
 
-**Full Error**: `FileNotFoundError: Snapshot directory './snapshots' does not exist`
+Common causes:
 
-**Cause**: The specified snapshot directory hasn't been created.
+- neither `rid` nor `conversation_id` was provided
+- `create_new_request=true` without `continuation_ids`
+- `create_new_request=true` without `max_new_tokens`
+- `continuation_ids` were provided while `create_new_request=false`
 
-**Solution**:
+What to do:
 
-```python
-import os
+- validate the request body on the client side before sending it
 
-# Create snapshot directory before running
-snapshot_dir = "./my_snapshots"
-os.makedirs(snapshot_dir, exist_ok=True)
+## Snapshot Exists But Generation Still Fails
 
-runtime = Runtime(
-    model_path="state-spaces/mamba-2.8b",
-    enable_snapshot_persistence=True,
-    snapshot_dir=snapshot_dir
-)
-```
+Possible causes:
 
----
+- model mismatch between the saved snapshot and the running server
+- missing `fill_ids` in snapshot metadata
+- Mamba pool unavailable
+- context-length constraints exceeded
 
-### "Failed to save snapshot"
+What to do:
 
-**Full Error**: Various errors during snapshot save operation.
+- log the full restore failure body
+- confirm the same model is running
+- confirm you are using the correct snapshot selectors
 
-**Cause**: Disk space issues, permission problems, or I/O errors.
+## Tokenization Mismatch In Restore-And-Generate
 
-**Solutions**:
+Symptom:
 
-1. **Check disk space**:
+- restore succeeds
+- generated answer is clearly wrong or detached from the prior state
 
-```bash
-df -h ./snapshots
-```
+Cause:
 
-2. **Check permissions**:
+- `continuation_ids` were not encoded the same way as the original server-side
+  prompt formatting
 
-```bash
-ls -ld ./snapshots
-chmod 755 ./snapshots  # If needed
-```
+What to do:
 
-3. **Verify snapshot directory is writable**:
+- use the same tokenizer as the server model
+- use the correct chat template
+- use `add_generation_prompt=True` for chat-style continuation encoding
 
-```python
-import os
-snapshot_dir = "./my_snapshots"
-if not os.access(snapshot_dir, os.W_OK):
-    print(f"Directory {snapshot_dir} is not writable")
-```
+## Python API Confusion
 
----
+Current reality:
 
-## Memory Problems
+- the direct methods on `s` are selector-based
+- `SnapshotManager` is constructed from `runtime.endpoint`
+- the current manager surface is `list_conversation`, `get_info`, `restore`,
+  and `delete`
 
-### Diagnosing Memory Issues
+If a document or example tells you to use the older engine-based manager
+constructor, per-request snapshot enable hooks, speculative persistence helpers,
+or bare snapshot-id restore flows, that document is stale or archival.
 
-```python
-import torch
+## Still Stuck?
 
-# Check GPU memory usage
-if torch.cuda.is_available():
-    allocated = torch.cuda.memory_allocated() / 1e9
-    reserved = torch.cuda.memory_reserved() / 1e9
-    print(f"GPU allocated: {allocated:.2f} GB")
-    print(f"GPU reserved: {reserved:.2f} GB")
+Check these next:
 
-# List snapshots to understand storage
-snapshots = s.list_snapshots()
-print(f"Number of snapshots: {len(snapshots)}")
-
-for snap in snapshots:
-    print(f"Snapshot - Turn: {snap['turn_number']}, Tokens: {snap['token_count']}")
-```
-
----
-
-## FAQ
-
-### Q: Can I use snapshots with transformer models?
-
-**A**: No, snapshots are Mamba-specific. Transformer models use KV cache, which is already optimized by the radix cache system.
-
----
-
-### Q: How much memory does each snapshot use?
-
-**A**: Typically 50-100 MB for Mamba-2.8B, varies by model size and sequence length. Check the snapshot metadata for details.
-
----
-
-### Q: Can I restore snapshots?
-
-**A**: Yes! Use `SnapshotManager(runtime.endpoint).restore(snapshot_id)` to restore any saved snapshot. The direct state method `s.restore_snapshot()` is coming soon.
-
----
-
-### Q: Can I share snapshots between different models?
-
-**A**: No, snapshots are model-specific. They contain SSM states that are only compatible with the exact model architecture.
-
----
-
-### Q: Are snapshots serializable for remote storage (S3, etc.)?
-
-**A**: Yes, the snapshot files saved to disk can be uploaded to remote storage. They are saved in safetensors format with JSON metadata.
-
-```python
-# Snapshots are saved to the configured directory
-# You can upload these files to S3 or other storage
-import boto3
-s3 = boto3.client('s3')
-# Upload both the safetensors artifact and JSON metadata
-s3.upload_file("./snapshots/snapshot_file.safetensors", "my-bucket", "snapshots/snapshot_file.safetensors")
-s3.upload_file("./snapshots/snapshot_file.json", "my-bucket", "snapshots/snapshot_file.json")
-```
-
----
-
-### Q: Can I snapshot in the middle of a generation?
-
-**A**: You can save a snapshot at any point, but it captures state up to the last completed token. Mid-generation snapshots capture state before the current `gen()` call completes.
-
----
-
-### Q: What file format are snapshots saved in?
-
-**A**: Snapshots are saved in safetensors format with accompanying JSON metadata files.
-
----
-
-## Getting Help
-
-If you're still experiencing issues:
-
-1. **Check logs**: Enable debug logging to see detailed error messages
-2. **GitHub Issues**: [Search or create an issue](https://github.com/sgl-project/sglang/issues)
-3. **Discussions**: [Ask the community](https://github.com/sgl-project/sglang/discussions)
-4. **Slack**: [Join #support channel](https://slack.sglang.io/)
-
-When reporting issues, please include:
-- SGLang version
-- Model name
-- Minimal reproduction code
-- Full error traceback
-- GPU memory usage
-- Snapshot configuration
-
-## See Also
-
-- [User Guide](user_guide.md) - Usage patterns and best practices
-- [API Reference](api_reference.md) - Detailed API documentation
-- [Architecture](architecture.md) - System design and internals
-- [Migration Guide](migration_guide.md) - Upgrading to snapshot support
+- [http_api_spec.md](http_api_spec.md)
+- [user_guide.md](user_guide.md)
+- [architecture.md](architecture.md)

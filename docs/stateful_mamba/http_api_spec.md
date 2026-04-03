@@ -1,20 +1,16 @@
-# Stateful Mamba HTTP API Specification
+# Engram HTTP API Spec
 
-Code-first HTTP specification for the snapshot endpoints implemented in the
-SGLang runtime server.
+Canonical technical draft for Engram's snapshot and statefulness HTTP surface.
 
-This document describes the server-facing API exposed by
-`python/sglang/srt/entrypoints/http_server.py` and the request/response
-dataclasses defined in `python/sglang/srt/managers/io_struct.py`.
+This document covers the additional snapshot endpoints implemented in this
+repository on top of SGLang's standard serving APIs. This specification and
+api_guide.md complement each other for Engram-specific HTTP integration.
 
-It is intentionally separate from
-[`api_reference.md`](api_reference.md), which focuses on the frontend Python
-snapshot API.
+The standard SGLang APIs such as `/v1/chat/completions` are documented
+elsewhere. This document focuses only on the snapshot/statefulness layer added
+here.
 
 ## Scope
-
-These endpoints are specific to Mamba-capable SGLang servers with snapshot
-persistence enabled.
 
 Implemented endpoints:
 
@@ -24,12 +20,14 @@ Implemented endpoints:
 - `POST /restore_snapshot`
 - `POST /delete_snapshot`
 
+All five routes are `ADMIN_OPTIONAL`.
+
 ## Server Prerequisites
 
-The snapshot API is only useful when the server is started with snapshot
+The snapshot API only applies when the server is started with snapshot
 persistence enabled.
 
-Minimum server flags:
+Minimum launch shape:
 
 ```bash
 python -m sglang.launch_server \
@@ -41,7 +39,7 @@ python -m sglang.launch_server \
   --trust-remote-code
 ```
 
-Recommended remote-access configuration:
+Recommended remote-access shape:
 
 ```bash
 python -m sglang.launch_server \
@@ -71,15 +69,15 @@ python -m sglang.launch_server \
 Notes:
 
 - `--mamba-scheduler-strategy` defaults to `auto`.
-- `auto` currently resolves to `no_buffer` in server args.
-- `extra_buffer` should only be forced on models and backends that support it.
-- `--chat-template` or `--hf-chat-template-name` may be needed for chat-style
-  clients so the client tokenizer matches the server's prompt serialization.
+- `auto` currently resolves to `no_buffer`.
+- The `extra_buffer` strategy should only be forced on models and backends that support it.
+- Chat-style clients should use the same tokenizer and chat template as the
+  server when producing `continuation_ids` for stateful generation.
 
-## Base URL And Transport
+## Transport
 
 - Base URL: `http://<host>:<port>`
-- Method: all snapshot endpoints are `POST`
+- Method: every snapshot endpoint is `POST`
 - Content type: `application/json`
 - Response format: JSON
 
@@ -91,15 +89,16 @@ http://localhost:30000
 
 ## Authentication
 
-Snapshot endpoints are marked `ADMIN_OPTIONAL`.
+Snapshot routes use the same `ADMIN_OPTIONAL` behavior as other admin-optional
+server routes.
 
-Effective auth behavior:
+Effective auth rules:
 
 - if neither `api_key` nor `admin_api_key` is configured, requests are allowed
   without auth
-- if only `api_key` is configured, clients must send that bearer token
-- if only `admin_api_key` is configured, clients must send that bearer token
-- if both are configured, snapshot endpoints require `admin_api_key`
+- if only `api_key` is configured, snapshot routes require that token
+- if only `admin_api_key` is configured, snapshot routes require that token
+- if both are configured, snapshot routes require `admin_api_key`
 
 Header format:
 
@@ -107,47 +106,60 @@ Header format:
 Authorization: Bearer <token>
 ```
 
-Example `curl` header:
-
-```bash
-curl -H "Authorization: Bearer $SGLANG_ADMIN_KEY" ...
-```
-
-## Request Conventions
+## Core Concepts
 
 ### `rid` vs `conversation_id`
 
-Several snapshot operations accept either a request id (`rid`) or a
-conversation id (`conversation_id`).
+These endpoints use two identifiers that solve different problems:
 
-- `rid` is the live request identifier inherited from `BaseReq`
-- `conversation_id` is the stable conversation identifier used to group
-  snapshots across turns
+- `rid` is a live request identifier
+- `conversation_id` is the stable snapshot grouping key used on disk and in
+  metadata
 
-For `restore_snapshot`, the server validates that at least one of these is
-provided.
+For restore-only flows, this distinction matters:
 
-### Stateful Generation Mode
+- `rid` is what allows the scheduler to inject restored state into a live
+  request
+- `conversation_id` is what allows the server to locate snapshot files
 
-`POST /restore_snapshot` has two modes:
+Using only `conversation_id` in restore-only mode can prove that state exists,
+but may not restore that state into a live request.
 
-1. Restore-only mode:
-   `create_new_request=false` or omitted. This restores prior state without
-   appending a new continuation.
-2. Restore-and-generate mode:
-   `create_new_request=true`. This requires both:
-   - `continuation_ids`
-   - `max_new_tokens`
+### Snapshot Selection
 
-When `continuation_ids` are supplied, the server blocks until generation
-completes and returns `output_ids` and `output_text`.
+Snapshot files are selected by:
 
-### Tokenization Requirement For `continuation_ids`
+- required `conversation_id` for list/info/delete
+- optional `turn_number`
+- optional `branch_name`
 
-For chat-style clients, `continuation_ids` must match the token format used to
-create the original request context. In practice, that means using the same
-tokenizer and chat template as the server and formatting the next user turn
-with `add_generation_prompt=True`.
+In practice, one of `turn_number` or `branch_name` is effectively required for
+`/get_snapshot_info` and `/delete_snapshot`, even though the request dataclasses
+type them as optional.
+
+### Stateful Generation
+
+`POST /restore_snapshot` supports two distinct modes:
+
+1. Restore-only:
+   `create_new_request=false` or omitted
+2. Restore-and-generate:
+   `create_new_request=true`
+
+Restore-and-generate requires:
+
+- `continuation_ids`
+- `max_new_tokens`
+
+When restore-and-generate succeeds, the response can include:
+
+- `output_ids`
+- `output_text`
+
+### Tokenization for `continuation_ids`
+
+For chat-style clients, `continuation_ids` must be encoded with the same
+tokenizer and prompt serialization strategy used by the server.
 
 Example:
 
@@ -164,49 +176,19 @@ formatted = tok.apply_chat_template(
 continuation_ids = tok.encode(formatted, add_special_tokens=False)
 ```
 
-Do not hand-embed literal `User:` / `Assistant:` markers unless that is also how
-the original prompt was serialized.
-
-## Response Conventions
-
-### Common Fields
-
-Most endpoints return:
-
-- `success`: boolean
-- `message`: optional human-readable status or error string
-
-### HTTP Status Codes
-
-Current route behavior is:
-
-- `200 OK` for successful `save_snapshot`, `list_snapshots`,
-  `get_snapshot_info`, and `delete_snapshot`
-- `400 Bad Request` for application-level validation failures in
-  `list_snapshots`, `get_snapshot_info`, and `delete_snapshot`
-- `500 Internal Server Error` for unhandled server-side failures
-- `500 Internal Server Error` for `restore_snapshot` when
-  `result.success == false`
-
-Important:
-
-- `restore_snapshot` may return a useful JSON body even when the HTTP status is
-  `500`
-- clients should parse the JSON body before treating non-`200` as an opaque
-  transport error
-
-## Endpoint Specification
+## Endpoint Reference
 
 ### `POST /save_snapshot`
 
-Save a snapshot for a live request or conversation.
+Save snapshot state for a live request or a request that has already fallen back
+to the WARM tier.
 
 #### Request Body
 
 ```json
 {
   "rid": "req-123",
-  "snapshot_id": "optional-custom-snapshot-id",
+  "snapshot_id": "optional-custom-id",
   "conversation_id": "chat-123",
   "turn_number": 2,
   "branch_name": "main"
@@ -215,11 +197,21 @@ Save a snapshot for a live request or conversation.
 
 Fields:
 
-- `rid`: optional string inherited from `BaseReq`
+- `rid`: optional string in the request model, but this is the real live
+  request lookup key
 - `snapshot_id`: optional string
-- `conversation_id`: optional string
-- `turn_number`: optional integer
-- `branch_name`: optional string
+- `conversation_id`: optional string used as the snapshot grouping key
+- `turn_number`: optional integer in the request model
+- `branch_name`: optional string in the request model
+
+Behavior notes:
+
+- saving a live active request really depends on `rid`
+- `conversation_id` alone does not identify a live request
+- saving without `turn_number` and `branch_name` only reliably works in the
+  WARM-tier fallback path where metadata is reconstructed for you
+- the lower storage layer effectively needs one of `turn_number` or
+  `branch_name`
 
 #### Success Response
 
@@ -231,7 +223,7 @@ Fields:
 }
 ```
 
-#### Error Response
+#### Failure Response
 
 ```json
 {
@@ -240,9 +232,14 @@ Fields:
 }
 ```
 
+Important:
+
+- handler-level save failures still return HTTP `200`
+- clients must inspect `success`, not just the status code
+
 ### `POST /list_snapshots`
 
-List all snapshots associated with a conversation.
+List snapshot metadata for a conversation.
 
 #### Request Body
 
@@ -263,46 +260,61 @@ Fields:
   "success": true,
   "snapshots": [
     {
-      "snapshot_id": "snap-abc",
       "conversation_id": "chat-123",
       "turn_number": 2,
-      "branch_name": "main"
+      "branch_name": null,
+      "timestamp": 1712345678.0,
+      "token_count": 128,
+      "model_name": "/workspace/models/granite-4.0-h-small"
     }
   ]
 }
 ```
 
-#### Error Response
+Notes:
+
+- each item is a metadata dictionary emitted by the snapshot layer
+- the exact metadata shape is implementation-defined and may include additional
+  fields such as `mamba_pool_idx`, `req_pool_idx`, `layer_config`, or `fill_ids`
+
+#### Empty Conversation Response
 
 ```json
 {
-  "success": false,
-  "message": "No snapshots found for conversation"
+  "success": true,
+  "snapshots": []
 }
 ```
 
-`snapshots` is returned as a list of metadata dictionaries. The exact keys are
-determined by the server-side metadata implementation.
+Important:
+
+- missing or empty conversations do not produce an application error
+- the current behavior is HTTP `200` with an empty list
 
 ### `POST /get_snapshot_info`
 
-Fetch metadata for a specific snapshot selection within a conversation.
+Fetch metadata for a specific snapshot selection inside a conversation.
 
 #### Request Body
 
 ```json
 {
   "conversation_id": "chat-123",
-  "turn_number": 2,
-  "branch_name": "main"
+  "turn_number": 2
 }
 ```
 
 Fields:
 
 - `conversation_id`: required string
-- `turn_number`: optional integer
-- `branch_name`: optional string
+- `turn_number`: optional integer in the request model
+- `branch_name`: optional string in the request model
+
+Behavior notes:
+
+- the request dataclass allows both `turn_number` and `branch_name` to be
+  omitted
+- the lower snapshot path logic effectively requires one of them
 
 #### Success Response
 
@@ -310,36 +322,38 @@ Fields:
 {
   "success": true,
   "metadata": {
-    "snapshot_id": "snap-abc",
     "conversation_id": "chat-123",
     "turn_number": 2,
-    "branch_name": "main"
+    "branch_name": null,
+    "timestamp": 1712345678.0,
+    "token_count": 128,
+    "model_name": "/workspace/models/granite-4.0-h-small"
   }
 }
 ```
 
-#### Error Response
+#### Failure Response
 
 ```json
 {
   "success": false,
-  "message": "Snapshot not found"
+  "message": "Snapshot not found: conversation=chat-123, turn=2, branch=None"
 }
 ```
 
 ### `POST /restore_snapshot`
 
-Restore Mamba state from a previously saved snapshot.
+Restore Mamba state from a saved snapshot.
 
-This is the most important endpoint for stateful clients.
+This is the most important endpoint for Engram-style stateful clients.
 
 #### Restore-Only Request
 
 ```json
 {
+  "rid": "req-123",
   "conversation_id": "chat-123",
-  "turn_number": 2,
-  "branch_name": "main"
+  "turn_number": 2
 }
 ```
 
@@ -363,16 +377,36 @@ Fields:
 - `create_new_request`: optional boolean, default `false`
 - `continuation_ids`: optional list of ints
 - `max_new_tokens`: optional int
-- `request_id`: optional correlation id; auto-generated by the server-side input
-  dataclass if omitted
+- `request_id`: optional correlation id; auto-generated if omitted
 
-Validation rules enforced by `RestoreSnapshotReqInput`:
+Validation rules enforced by the request dataclass:
 
 - at least one of `rid` or `conversation_id` must be provided
 - if `create_new_request=false`, `continuation_ids` and `max_new_tokens` must
   not be supplied
 - if `create_new_request=true`, both `continuation_ids` and `max_new_tokens`
   are required
+
+#### Restore-Only Behavior
+
+Restore-only is best understood as a live-request operation.
+
+- if a live `rid` is found, the scheduler can inject restored state into that
+  request
+- if only `conversation_id` is provided, or the `rid` cannot be resolved to a
+  live request, the server may report that snapshot state is available for
+  future requests instead of performing an in-place restore
+
+#### Restore-And-Generate Behavior
+
+When `create_new_request=true`:
+
+- if `turn_number` and `branch_name` are both omitted, the latest snapshot is
+  selected
+- the scheduler enforces model compatibility
+- `fill_ids` must exist in the snapshot metadata
+- the scheduler checks Mamba pool availability and context-length constraints
+- the response can include decoded `output_text`
 
 #### Success Response
 
@@ -388,57 +422,49 @@ Validation rules enforced by `RestoreSnapshotReqInput`:
 }
 ```
 
-Response fields:
-
-- `success`: boolean
-- `rid`: request id for the restored or newly created request
-- `mamba_pool_idx`: optional internal pool slot index
-- `message`: optional status string
-- `token_count`: optional integer count associated with restored state
-- `output_ids`: optional generated token ids for restore-and-generate mode
-- `output_text`: optional decoded generated text for restore-and-generate mode
-
-#### Error Response
-
-Example application-level failure:
+#### Failure Response
 
 ```json
 {
   "success": false,
   "rid": null,
   "mamba_pool_idx": null,
-  "message": "Snapshot not found for conversation_id=chat-123",
+  "message": "Snapshot not found for conversation=chat-123",
   "token_count": null,
   "output_ids": null,
   "output_text": null
 }
 ```
 
-Client guidance:
+Important:
 
-- always parse the JSON body
-- then inspect `success`
-- do not rely on `raise_for_status()` alone for debugging restore failures
+- application-level restore failures are returned as HTTP `500`
+- clients should always parse the JSON body before treating a restore failure as
+  a generic transport error
 
 ### `POST /delete_snapshot`
 
-Delete a snapshot selection within a conversation.
+Delete one snapshot selection within a conversation.
 
 #### Request Body
 
 ```json
 {
   "conversation_id": "chat-123",
-  "turn_number": 2,
-  "branch_name": "main"
+  "turn_number": 2
 }
 ```
 
 Fields:
 
 - `conversation_id`: required string
-- `turn_number`: optional integer
-- `branch_name`: optional string
+- `turn_number`: optional integer in the request model
+- `branch_name`: optional string in the request model
+
+Behavior notes:
+
+- in practice the lower storage layer expects one of `turn_number` or
+  `branch_name`
 
 #### Success Response
 
@@ -449,7 +475,7 @@ Fields:
 }
 ```
 
-#### Error Response
+#### Failure Response
 
 ```json
 {
@@ -458,9 +484,9 @@ Fields:
 }
 ```
 
-## Client Configuration Examples
+## Client Examples
 
-### 1. Python `requests` Client
+### Python `requests`
 
 ```python
 import requests
@@ -475,42 +501,22 @@ session.headers.update(
         "Content-Type": "application/json",
     }
 )
-```
 
-Save a snapshot:
-
-```python
 save_resp = session.post(
     f"{BASE_URL}/save_snapshot",
-    json={"rid": "req-123"},
+    json={
+        "rid": "req-123",
+        "conversation_id": "chat-123",
+        "turn_number": 2,
+    },
     timeout=30,
 )
-save_resp.raise_for_status()
 save_body = save_resp.json()
+if not save_body.get("success"):
+    raise RuntimeError(save_body)
 ```
 
-Restore and generate:
-
-```python
-restore_resp = session.post(
-    f"{BASE_URL}/restore_snapshot",
-    json={
-        "conversation_id": "chat-123",
-        "create_new_request": True,
-        "continuation_ids": continuation_ids,
-        "max_new_tokens": 80,
-    },
-    timeout=120,
-)
-
-restore_body = restore_resp.json()
-if not restore_body.get("success"):
-    raise RuntimeError(f"restore failed: {restore_body}")
-```
-
-### 2. Python Client Using A Chat Template
-
-This is the recommended pattern for chat-style Mamba clients.
+### Python Restore-And-Generate
 
 ```python
 import requests
@@ -518,21 +524,16 @@ from transformers import AutoTokenizer
 
 BASE_URL = "http://localhost:30000"
 MODEL_PATH = "/workspace/models/granite-4.0-h-small"
+
 tok = AutoTokenizer.from_pretrained(MODEL_PATH)
-
-def encode_continuation(messages):
-    formatted = tok.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-    )
-    return tok.encode(formatted, add_special_tokens=False)
-
-continuation_ids = encode_continuation(
-    [{"role": "user", "content": "What is my favorite color?"}]
+formatted = tok.apply_chat_template(
+    [{"role": "user", "content": "What is my favorite color?"}],
+    tokenize=False,
+    add_generation_prompt=True,
 )
+continuation_ids = tok.encode(formatted, add_special_tokens=False)
 
-r = requests.post(
+resp = requests.post(
     f"{BASE_URL}/restore_snapshot",
     json={
         "conversation_id": "chat-123",
@@ -542,11 +543,13 @@ r = requests.post(
     },
     timeout=120,
 )
-body = r.json()
-print(body["output_text"])
+body = resp.json()
+if not body.get("success"):
+    raise RuntimeError(body)
+print(body.get("output_text"))
 ```
 
-### 3. JavaScript / TypeScript Client
+### JavaScript / TypeScript
 
 ```ts
 const baseUrl = "http://localhost:30000";
@@ -572,67 +575,47 @@ if (!body.success) {
 }
 ```
 
-### 4. Example Client Configuration Object
-
-```yaml
-engram:
-  base_url: http://mamba-host:30000
-  auth:
-    bearer_token_env: SGLANG_ADMIN_KEY
-  snapshot_api:
-    save_path: /save_snapshot
-    restore_path: /restore_snapshot
-    list_path: /list_snapshots
-    info_path: /get_snapshot_info
-    delete_path: /delete_snapshot
-  timeouts:
-    save_seconds: 30
-    restore_seconds: 120
-  tokenizer:
-    model_path: /workspace/models/granite-4.0-h-small
-    use_chat_template: true
-    add_generation_prompt: true
-```
-
 ## Recommended Client Workflow
 
-### Pattern A: Full Chat First, Stateful Continuations After
+### Pattern A: Standard Chat, Then Snapshot
 
-1. Send turn 1 using `/v1/chat/completions`.
-2. Save a snapshot with `/save_snapshot` using the original `rid`.
-3. For later turns, tokenize only the new turn into `continuation_ids`.
-4. Call `/restore_snapshot` with `create_new_request=true`.
-5. Read `output_text` from the response.
+1. Generate normally through `/v1/chat/completions`.
+2. Save a snapshot using the original `rid`.
+3. Keep your own `conversation_id`, `turn_number`, and `branch_name` mapping.
+4. Use `/list_snapshots` and `/get_snapshot_info` for inspection.
+5. Use `/restore_snapshot` in restore-and-generate mode for later turns.
 
-### Pattern B: Snapshot Catalog Management
+### Pattern B: Restore-And-Generate
 
-1. Save snapshots after important turns.
-2. List snapshots by `conversation_id`.
-3. Inspect metadata before restore.
-4. Delete old branches or stale turns when no longer needed.
+1. Save snapshots at important turn boundaries.
+2. Tokenize only the new user turn as `continuation_ids`.
+3. Call `/restore_snapshot` with `create_new_request=true`.
+4. Read `output_text` and the returned `rid`.
 
-## Error Handling Recommendations
+## Known Contract Oddities
 
-- Parse the JSON response body even for `500` responses from
-  `/restore_snapshot`.
-- Treat `success=false` as the authoritative application-level failure signal.
-- Log both HTTP status and response JSON.
-- Use longer client timeouts for restore-and-generate flows than for metadata
-  operations.
+- `/save_snapshot` can fail at the application layer while still returning HTTP
+  `200`.
+- `/restore_snapshot` maps application-level failure to HTTP `500`.
+- some fields are typed optional in the request dataclasses but are effectively
+  required by lower storage-layer behavior
+- direct HTTP coverage is strongest for `/save_snapshot` and
+  `/restore_snapshot`; `/list_snapshots`, `/get_snapshot_info`, and
+  `/delete_snapshot` are more code-confirmed than end-to-end tested
 
-## Current Limitations
+## Validated Against
 
-- There is no published OpenAPI or Swagger document yet; this spec is derived
-  from the implemented code.
-- `snapshots` and `metadata` payload shapes are partially implementation-defined
-  dictionaries rather than strict public schemas.
-- `mamba_pool_idx` is returned today but should be treated as diagnostic data,
-  not a stable client contract.
-
-## Source Of Truth
-
-When this document and code diverge, the current source of truth is:
+Primary implementation sources:
 
 - `python/sglang/srt/entrypoints/http_server.py`
 - `python/sglang/srt/managers/io_struct.py`
+- `python/sglang/srt/managers/scheduler.py`
 - `python/sglang/srt/managers/tokenizer_manager.py`
+- `python/sglang/lang/interpreter.py`
+- `python/sglang/snapshot.py`
+
+Tests and validation references:
+
+- `test/registered/radix_cache/test_mamba_snapshot_e2e.py`
+- `test/registered/radix_cache/test_mamba_stateful_inference.py`
+- `test/sglang/snapshot/test_mamba_snapshot.py`
