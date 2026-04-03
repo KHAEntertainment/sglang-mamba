@@ -10,7 +10,7 @@
 Stop re-reading every conversation from scratch.
 Save model state. Restore in 2ms. Cut token costs by 94%.
 
-[Quick Start](#quick-start) | [Benchmarks](#benchmarks) | [API Reference](#api-extensions) | [Architecture](#how-it-works)
+[Quick Start](#quick-start) | [Benchmarks](#benchmarks) | [API Guide](docs/stateful_mamba/api_guide.md) | [Architecture](#how-it-works)
 
 </div>
 
@@ -167,12 +167,17 @@ Engram adds four things to SGLang to exploit this property:
 
 Engram extends SGLang's API with snapshot management endpoints. All existing SGLang endpoints work unchanged.
 
+For most developers, start with the user-friendly [API Guide](docs/stateful_mamba/api_guide.md).
+For the exact technical contract and current implementation quirks, use
+[HTTP API Spec](docs/stateful_mamba/http_api_spec.md).
+
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/save_snapshot` | POST | Save current conversation state |
 | `/restore_snapshot` | POST | Restore a previously saved state |
-| `/list_snapshots` | GET | List all saved snapshots |
-| `/delete_snapshot` | DELETE | Remove a saved snapshot |
+| `/list_snapshots` | POST | List all saved snapshots for a conversation |
+| `/get_snapshot_info` | POST | Fetch metadata for one selected snapshot |
+| `/delete_snapshot` | POST | Remove a saved snapshot |
 
 ### Server Flags
 
