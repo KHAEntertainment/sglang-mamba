@@ -28,3 +28,12 @@ history. They refer to this same project.
 If `.claude/local-notes.md` exists, it may contain local maintainer preferences
 or environment details. Treat it as local-only context, not public project
 policy.
+
+## Protected Paths
+
+Protected-path policy lives in `.engram/policy/protected-paths.json`.
+The shared helper is `scripts/policy/check_protected_paths.py`.
+
+Agents should treat protected-path edits and upstream touches as review-required
+work, and should update the policy file rather than hardcoding new path rules in
+the workflow.

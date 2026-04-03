@@ -67,6 +67,12 @@ repos:
           - '--extra-keys=metadata.kernelspec metadata.language_info.version'
   - repo: local
     hooks:
+      - id: engram-protected-path-guard
+        name: engram protected path guard
+        entry: python3 scripts/policy/check_protected_paths.py check-local-edits
+        language: system
+        pass_filenames: true
+        stages: [pre-commit, pre-push]
       - id: check-chinese-characters
         name: check chinese characters in multimodal_gen
         entry: >-
@@ -80,6 +86,12 @@ repos:
         entry: python3 .github/update_ci_permission.py --sort-only
         language: system
         files: ^\.github/CI_PERMISSIONS\.json$
+        pass_filenames: false
+      - id: validate-engram-protected-path-policy
+        name: validate engram protected path policy
+        entry: python3 scripts/policy/check_protected_paths.py validate-policy
+        language: system
+        files: ^(\.engram/policy/protected-paths\.json|scripts/policy/check_protected_paths\.py|\.github/workflows/upstream-sync\.yml|AGENTS\.md|CLAUDE\.md)$
         pass_filenames: false
   - repo: https://github.com/lycheeverse/lychee.git
     rev: lychee-v0.22.0

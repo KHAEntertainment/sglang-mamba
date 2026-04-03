@@ -31,10 +31,6 @@ env:
   FORK_BRANCH: main
   SYNC_BRANCH_PREFIX: auto-sync/upstream
 
-  # Fork-differentiated paths (pipe-separated for grep -E).
-  # Changes touching these require manual review.
-  FORK_PATHS: "python/sglang/srt/snapshot/|python/sglang/srt/agents/|python/sglang/srt/mem_cache/mamba_radix_cache.py|python/sglang/srt/mem_cache/memory_pool.py|python/sglang/srt/managers/scheduler.py|python/sglang/srt/layers/attention/mamba/mamba2_metadata.py|python/sglang/snapshot.py|test/sglang/snapshot/|test/sglang/agents/|test/phases/|CLAUDE.md|AGENTS.md|docs/migration-prep/"
-
 jobs:
   sync:
     runs-on: ubuntu-latest
@@ -114,32 +110,11 @@ jobs:
         if: steps.drift.outputs.skip == 'false'
         id: classify
         run: |
-          PATTERN="${{ env.FORK_PATHS }}"
-          UPSTREAM_TOUCHED=$(git diff --name-only ${{ steps.merge.outputs.pre_merge_sha }}..upstream/${{ env.UPSTREAM_BRANCH }} | grep -E "$PATTERN" || true)
-
-          if [ -n "$UPSTREAM_TOUCHED" ]; then
-            echo "touched_fork_files<<EOF" >> "$GITHUB_OUTPUT"
-            echo "$UPSTREAM_TOUCHED" >> "$GITHUB_OUTPUT"
-            echo "EOF" >> "$GITHUB_OUTPUT"
-          fi
-
-          if [ "${{ steps.merge.outputs.merge_clean }}" = "false" ]; then
-            if [ -n "$UPSTREAM_TOUCHED" ]; then
-              echo "risk_level=high" >> "$GITHUB_OUTPUT"
-              echo "risk_reason=Merge is blocked and upstream touched protected fork files" >> "$GITHUB_OUTPUT"
-            else
-              echo "risk_level=medium" >> "$GITHUB_OUTPUT"
-              echo "risk_reason=Merge conflicts in upstream-only files (likely resolvable)" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            if [ -n "$UPSTREAM_TOUCHED" ]; then
-              echo "risk_level=high" >> "$GITHUB_OUTPUT"
-              echo "risk_reason=Clean merge, but upstream touched protected fork files" >> "$GITHUB_OUTPUT"
-            else
-              echo "risk_level=low" >> "$GITHUB_OUTPUT"
-              echo "risk_reason=Clean merge, no protected fork files affected" >> "$GITHUB_OUTPUT"
-            fi
-          fi
+          python3 scripts/policy/check_protected_paths.py classify-upstream-sync \
+            --fork-ref "${{ steps.merge.outputs.pre_merge_sha }}" \
+            --upstream-ref "upstream/${{ env.UPSTREAM_BRANCH }}" \
+            --conflicts "${{ steps.merge.outputs.conflicts }}" \
+            --github-output "$GITHUB_OUTPUT"
 
       # ── 6. Build PR body ──────────────────────────────────────────────
       - name: Build PR description
@@ -170,10 +145,10 @@ jobs:
             echo "${COMMIT_LOG}"
             echo '```'
             echo ""
-            if [ -n "${{ steps.classify.outputs.touched_fork_files }}" ]; then
+            if [ -n "${{ steps.classify.outputs.protected_upstream_touches }}" ]; then
               echo "### Protected fork files touched upstream"
               echo '```'
-              echo "${{ steps.classify.outputs.touched_fork_files }}"
+              echo "${{ steps.classify.outputs.protected_upstream_touches }}"
               echo '```'
               echo "> Review required: upstream touched files that are explicitly protected in this fork."
               echo ""
@@ -281,7 +256,7 @@ jobs:
             const behind = '${{ steps.drift.outputs.commits_behind }}';
             const conflicts = '${{ steps.merge.outputs.conflicts }}';
             const risk = '${{ steps.classify.outputs.risk_level }}';
-            const touchedForkFiles = `${{ steps.classify.outputs.touched_fork_files }}`.trim();
+            const touchedForkFiles = `${{ steps.classify.outputs.protected_upstream_touches }}`.trim();
             const labels = ['upstream-sync', 'needs-review'];
 
             // Ensure labels exist before issue creation tries to attach them.
@@ -343,11 +318,11 @@ jobs:
           echo "| PR created | ${{ steps.create-pr.outputs.pr_url || 'N/A' }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dry run | ${{ inputs.dry_run || 'false' }} |" >> $GITHUB_STEP_SUMMARY
 
-          if [ -n "${{ steps.classify.outputs.touched_fork_files }}" ]; then
+          if [ -n "${{ steps.classify.outputs.protected_upstream_touches }}" ]; then
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "### Protected fork files touched upstream" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "${{ steps.classify.outputs.touched_fork_files }}" >> $GITHUB_STEP_SUMMARY
+            echo "${{ steps.classify.outputs.protected_upstream_touches }}" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
           fi
 

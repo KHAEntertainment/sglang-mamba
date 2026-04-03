@@ -49,3 +49,18 @@ historical reference only.
   project policy
 - Project skill files under `.claude/skills/` are intended to help agents work
   inside this repository
+
+## Protected Path Policy
+
+- The source of truth for protected files is
+  `.engram/policy/protected-paths.json`
+- Upstream sync automation and local agent guardrails both use
+  `scripts/policy/check_protected_paths.py`
+- Static protected globs cover permanently sensitive Engram surfaces
+- Dynamic protection also applies to fork-owned files detected relative to
+  `upstream/main`
+- If upstream touches any protected file, automation must not auto-merge
+- If you intentionally edit protected files locally, acknowledge that review is
+  required by rerunning with `ENGRAM_ALLOW_PROTECTED_EDITS=1`
+- Do not add new workflow-only path rules in `.github/workflows/upstream-sync.yml`;
+  update `.engram/policy/protected-paths.json` instead

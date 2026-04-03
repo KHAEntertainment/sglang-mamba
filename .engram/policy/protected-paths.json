@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "description": "Shared protected-path policy for Engram upstream sync automation and local agent guardrails.",
+  "static_protected_globs": [
+    ".claude/skills/**",
+    "python/sglang/snapshot.py",
+    "python/sglang/srt/agents/**",
+    "python/sglang/srt/layers/attention/mamba/mamba2_metadata.py",
+    "python/sglang/srt/managers/scheduler.py",
+    "python/sglang/srt/mem_cache/mamba_radix_cache.py",
+    "python/sglang/srt/mem_cache/memory_pool.py",
+    "python/sglang/srt/snapshot/**",
+    "test/sglang/agents/**",
+    "test/sglang/snapshot/**",
+    "test/phases/**",
+    "CLAUDE.md",
+    "AGENTS.md",
+    "docs/migration-prep/**"
+  ],
+  "local_only_globs": [
+    ".claude/local-notes.md"
+  ],
+  "enforcement": {
+    "local_ack_env": "ENGRAM_ALLOW_PROTECTED_EDITS"
+  }
+}
