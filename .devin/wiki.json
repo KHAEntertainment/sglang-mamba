@@ -1,0 +1,209 @@
+{
+  "repo_notes": [
+    {
+      "author": "ChatGPT",
+      "content": "Document this repository as a maintained SGLang fork/distribution with first-party Engram extensions, not as a standalone plugin that happens to sit beside SGLang. Engram ships inside a full maintained version of SGLang and should be described that way throughout the wiki. Prioritize explaining: (1) what SGLang provides unchanged, (2) what Engram adds or modifies, and (3) exactly where the integration points live in the runtime. The most important Engram additions are snapshot persistence for recurrent-state models, the VRAM→RAM→disk tier manager, conversation tracking and retention policies, recurrent-state-aware cache and memory pool changes, the snapshot API surface, and the agent tooling. Avoid spending large amounts of space on upstream SGLang subsystems that are not central to Engram's value proposition or code changes; only document those upstream areas insofar as they help explain Engram. The opening sections of major pages should be understandable to a technical executive or senior product/engineering leader, then progressively move into code-level details. Keep the core product framing consistent with the repo: Engram lets AI models remember by saving and restoring recurrent internal state instead of re-processing full conversations. Also make clear that Engram is not RAG, not fine-tuning, and not generic transformer KV-cache persistence. Highlight that compatibility is broader than pure Mamba2 when a model's recurrent state flows through SGLang's recurrent/Mamba cache path, including architectures like GLA. If the wiki renderer can display repository images, prefer placing assets/engram-logo-banner.png at the top of the root overview page, but do not invent unsupported formatting if image embedding is unavailable."
+    }
+  ],
+  "pages": [
+    {
+      "title": "Engram Overview",
+      "purpose": "High-level introduction to Engram: what problem it solves, why recurrent-state persistence matters, how it relates to SGLang, and how the wiki is organized.",
+      "page_notes": [
+        {
+          "content": "This should be the landing page. Explicitly state that Engram is a maintained fork/distribution of SGLang with integrated extensions, not a standalone sidecar or plugin. Open with an accessible explanation of why AI systems keep re-reading history today and how Engram changes that. If supported, use the repository banner image assets/engram-logo-banner.png near the top."
+        }
+      ]
+    },
+    {
+      "title": "Why Persistent State Matters",
+      "purpose": "Explain the stateless-serving problem Engram addresses, why recurrent-state models create a new opportunity, and how Engram differs from RAG, fine-tuning, and transformer KV-cache persistence.",
+      "parent": "Engram Overview",
+      "page_notes": [
+        {
+          "content": "This page should translate the technical idea into clear systems and product consequences: fewer tokens reprocessed, faster resume, lower cost for long-running agents. Include the conceptual contrast with transformer KV caches versus fixed-size recurrent state."
+        }
+      ]
+    },
+    {
+      "title": "Getting Started",
+      "purpose": "Show how to install Engram, launch the server with snapshot persistence enabled, send an initial request, save a snapshot, and restore it later using the public API.",
+      "parent": "Engram Overview",
+      "page_notes": [
+        {
+          "content": "Ground this page in the actual launch flags and request flow used by the repository README. Keep it practical and concise. Make clear which commands are standard SGLang usage and which are Engram-specific additions."
+        }
+      ]
+    },
+    {
+      "title": "Architecture: Maintained SGLang Distribution + Engram Extensions",
+      "purpose": "Describe the overall system architecture, separating inherited SGLang runtime responsibilities from Engram-specific extensions and showing how they fit together in one maintained codebase.",
+      "parent": "Engram Overview",
+      "page_notes": [
+        {
+          "content": "This page should correct the common misconception that Engram is merely an external extension. Show the whole stack as a full SGLang serving runtime with focused modifications and additions for recurrent-state persistence."
+        }
+      ]
+    },
+    {
+      "title": "SGLang Runtime Components Relevant to Engram",
+      "purpose": "Document only the core upstream runtime components that are necessary to understand Engram, including the serving pipeline, scheduling, request management, model execution, and memory/cache interfaces Engram touches.",
+      "parent": "Architecture: Maintained SGLang Distribution + Engram Extensions",
+      "page_notes": [
+        {
+          "content": "Do not try to turn this into a full encyclopedia of all SGLang features. Focus on the pieces Engram builds on or modifies."
+        }
+      ]
+    },
+    {
+      "title": "Request Lifecycle and Hook Points",
+      "purpose": "Trace a request from HTTP ingress through TokenizerManager, Scheduler, model execution, and DetokenizerManager, highlighting where Engram attaches snapshot save/restore behavior and conversation tracking.",
+      "parent": "Architecture: Maintained SGLang Distribution + Engram Extensions",
+      "page_notes": [
+        {
+          "content": "Make the integration points concrete. Readers should be able to understand where state is captured, restored, and coordinated relative to the normal request path."
+        }
+      ]
+    },
+    {
+      "title": "Memory and Scheduling Integration",
+      "purpose": "Explain the runtime and scheduler behaviors that matter for Engram, including recurrent-state-aware memory pools, cache behavior, and any snapshot-related launch flags or scheduler strategies.",
+      "parent": "Architecture: Maintained SGLang Distribution + Engram Extensions",
+      "page_notes": [
+        {
+          "content": "Cover the practical interactions between snapshot persistence and runtime behavior, including why certain flags or cache modes are used, how recurrent-state memory differs from transformer-oriented assumptions, and what operators need to know."
+        }
+      ]
+    },
+    {
+      "title": "Snapshot Persistence",
+      "purpose": "Introduce Engram's core persistence subsystem and link to the detailed pages covering serialization, tiering, policies, memory structures, and APIs.",
+      "parent": "Engram Overview",
+      "page_notes": [
+        {
+          "content": "Treat this as the central Engram feature page. Summarize the end-to-end snapshot story before diving into individual implementation pages."
+        }
+      ]
+    },
+    {
+      "title": "Snapshot Manager and Serialization Flow",
+      "purpose": "Document how snapshot save and restore work internally, including the manager classes, serialized state contents, validation, and the flow from live model state to durable snapshot and back.",
+      "parent": "Snapshot Persistence",
+      "page_notes": [
+        {
+          "content": "Explain exactly what is persisted for supported recurrent models and how restore reconstructs an execution-ready conversation state. Mention any integrity or state-validation mechanisms."
+        }
+      ]
+    },
+    {
+      "title": "Tiered Memory Hierarchy",
+      "purpose": "Explain the three-tier snapshot storage hierarchy across VRAM, host RAM, and disk, including promotion, eviction, and latency tradeoffs for hot, warm, and cold sessions.",
+      "parent": "Snapshot Persistence",
+      "page_notes": [
+        {
+          "content": "This page should make the operational model easy to understand. Explain what lives in each tier, why, and how movement between tiers is managed."
+        }
+      ]
+    },
+    {
+      "title": "Conversation Tracking, Policies, and Branching",
+      "purpose": "Document how Engram tracks conversation identity and lifecycle, applies retention and trigger policies, and supports restore, branching, and other memory-management behaviors over time.",
+      "parent": "Snapshot Persistence",
+      "page_notes": [
+        {
+          "content": "Emphasize the idea that snapshots are not just files but managed conversation checkpoints with lifecycle rules."
+        }
+      ]
+    },
+    {
+      "title": "Recurrent State Storage: Caches, Pools, and Metadata",
+      "purpose": "Explain the lower-level memory structures Engram relies on or modifies for recurrent-state models, including recurrent-aware cache structures, memory pools, and metadata handling.",
+      "parent": "Snapshot Persistence",
+      "page_notes": [
+        {
+          "content": "Focus on the code and data structures that make recurrent-state persistence possible, such as Mamba-aware cache or pool components. Contrast these with transformer KV-cache assumptions where useful."
+        }
+      ]
+    },
+    {
+      "title": "Snapshot HTTP API and Server Flags",
+      "purpose": "Document the public snapshot endpoints and launch-time configuration for enabling and operating Engram in practice.",
+      "parent": "Snapshot Persistence",
+      "page_notes": [
+        {
+          "content": "Cover the save, restore, list, delete, and metadata endpoints, along with the relevant launch flags and operator-facing configuration. Include request and response behavior grounded in the codebase."
+        }
+      ]
+    },
+    {
+      "title": "Serving Interfaces",
+      "purpose": "Describe the user-facing serving surfaces available in the repository, including standard SGLang/OpenAI-compatible APIs and any Engram-specific API extensions or streaming surfaces.",
+      "parent": "Engram Overview",
+      "page_notes": [
+        {
+          "content": "Make clear that existing SGLang serving interfaces remain available because Engram ships as a maintained SGLang distribution. Then show what Engram adds on top."
+        }
+      ]
+    },
+    {
+      "title": "Agent Framework and Tool Execution",
+      "purpose": "Document the built-in agent loop, tool registry, execution engine, and how agents use snapshot persistence for checkpointing, restore, and longer-lived memory behaviors.",
+      "parent": "Engram Overview",
+      "page_notes": [
+        {
+          "content": "Explain the agent tooling as an application of persistence, not a separate product. Connect tool execution and memory operations back to snapshots and conversation lifecycle management."
+        }
+      ]
+    },
+    {
+      "title": "Model Compatibility and Recurrent Architecture Support",
+      "purpose": "Explain which models and architecture families Engram supports today, why support generalizes beyond pure Mamba2, and what conditions must hold for a model to work with the persistence system.",
+      "parent": "Engram Overview",
+      "page_notes": [
+        {
+          "content": "Do not describe Engram as only supporting a single model family if the code and test results show broader support. Explain the role of recurrent state routing and why architectures like GLA can work when they flow through the relevant runtime path."
+        }
+      ]
+    },
+    {
+      "title": "Benchmarks and Performance Characteristics",
+      "purpose": "Summarize the validated performance gains, restore latencies, token reduction, snapshot-size behavior, and the benchmarked model matrix.",
+      "parent": "Engram Overview",
+      "page_notes": [
+        {
+          "content": "Use the repository's grounded benchmark claims and compatibility results. Keep this page factual and code-adjacent rather than sounding like marketing copy."
+        }
+      ]
+    },
+    {
+      "title": "Upstream Sync and Fork Maintenance",
+      "purpose": "Document how the repository stays aligned with upstream SGLang, including sync automation, conflict handling, and how Engram preserves access to upstream capabilities while shipping custom persistence features.",
+      "parent": "Engram Overview",
+      "page_notes": [
+        {
+          "content": "This page should reinforce that Engram is a maintained fork with active upstream tracking, not a one-off divergence."
+        }
+      ]
+    },
+    {
+      "title": "Testing, Validation, and Current Limitations",
+      "purpose": "Describe the repository's testing strategy, phased validation approach, known unsupported or blocked model paths, and the current maturity boundaries of the system.",
+      "parent": "Engram Overview",
+      "page_notes": [
+        {
+          "content": "Include what has been validated, what remains experimental, and any current blockers that are due to upstream gaps rather than Engram design limitations."
+        }
+      ]
+    },
+    {
+      "title": "Code Map and Key Source Files",
+      "purpose": "Provide a guided map of the most important directories and files for contributors trying to understand where Engram lives inside the broader SGLang codebase.",
+      "parent": "Engram Overview",
+      "page_notes": [
+        {
+          "content": "This page should help new contributors orient quickly: where snapshot code lives, which runtime files matter most, where agent tooling lives, and which files are still primarily upstream SGLang."
+        }
+      ]
+    }
+  ]
+}
