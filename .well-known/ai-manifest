@@ -1,0 +1,7 @@
+{
+  "name": "Engram",
+  "manifest": "https://clarit.ai/engram.json",
+  "funding": "https://clarit.ai/funding.json",
+  "website": "https://clarit.ai/engram",
+  "repository": "https://github.com/clarit-ai/engram"
+}
