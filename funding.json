@@ -22,7 +22,7 @@
       "repositoryUrl": {
         "url": "https://github.com/Clarit-AI/Engram",
         "wellKnown": "https://github.com/Clarit-AI/Engram/blob/main/.well-known/funding-manifest-urls"
-      }
+      },
       "licenses": [
         "spdx:Apache-2.0"
       ],
