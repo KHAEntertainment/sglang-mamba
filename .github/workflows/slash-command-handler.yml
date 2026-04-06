@@ -14,7 +14,7 @@ jobs:
   slash_command:
     # Only run if it is a PR and the comment contains a recognized command
     # Use contains() since startsWith() can't handle leading whitespace/newlines
-    if: >
+    if: github.repository == 'sgl-project/sglang' && >
       github.event.issue.pull_request &&
       (contains(github.event.comment.body, '/tag-run-ci-label') ||
        contains(github.event.comment.body, '/rerun-failed-ci') ||
