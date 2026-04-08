@@ -68,26 +68,28 @@ Validated on H200 across the full test suite (77/82 pass, 0 regressions):
 
 | Model | Params | Snapshot Size | Notes |
 |-------|--------|--------------|-------|
-| Nemotron-Cascade-2-30B | 30B | ~47 MB | Smallest — MoE routing, fewer Mamba layers |
-| Granite 4.0-H-tiny | 4B | ~56 MB | Primary benchmark model |
+| Qwen3-Next-80B-A3B (TP4) | 80B/3B active | ~19 MB | Smallest — MoE with small hidden_size |
+| Granite 4.0-H-tiny (TP4) | 4B | ~14 MB | TP=4 gathers state to rank 0 |
+| Granite 4.0-H-tiny (TP1) | 4B | ~56 MB | Primary benchmark model |
 | Granite 4.0-H-small | 32B | ~146 MB | 36 Mamba layers, BF16 |
+| Codestral Mamba 7B | 7B | ~260 MB | Pure Mamba2 — large SSM state (64 layers) |
 | Nemotron-3-Super-120B | 120B | ~5.3 GB | 88 layers, FP8, LatentMoE |
-| Qwen3-Coder-Next | ~75B | ~23.7 GB | GLA recurrent state (not Mamba2) |
 
 All sizes are constant regardless of conversation length — a 1M-token conversation saves the same bytes as a 1K-token one.
 
 ### Tested Models
 
-5 of 6 models fully compatible with stateful recall confirmed across all architectures.
+7 models validated across 4 vendors. Pure Mamba2 support is an Engram-only capability — upstream SGLang cannot run these models.
 
-| Model | Vendor | Architecture | Format | Stateful Recall | Status |
-|-------|--------|-------------|--------|-----------------|--------|
-| Granite 4.0-H-tiny (4B) | IBM | Dense Mamba2 hybrid | BF16 | PASS | Full suite (Phases 0–10) |
-| Granite 4.0-H-small (32B) | IBM | Dense Mamba2 hybrid | BF16 | PASS | Compat protocol |
-| Nemotron-Cascade-2-30B | NVIDIA | MoE Mamba2 hybrid | BF16 | PASS | Phase 10 cross-model |
-| Nemotron-3-Super-120B-A12B | NVIDIA | LatentMoE Mamba2 hybrid (88L) | FP8 | PASS | 96.4% — 54/56 effective |
-| Qwen3-Coder-Next | Alibaba | Gated Linear Attention + MoE (48L) | FP8 | PASS | 62/62 — zero model-specific failures |
-| Codestral Mamba 7B | Mistral | Pure Mamba2 | BF16 | — | Blocked — pending native SGLang model class |
+| Model | Vendor | Architecture | Token Reduction | Snapshot Size | Status |
+|-------|--------|-------------|-----------------|---------------|--------|
+| Granite 4.0-H-tiny (4B) | IBM | Dense Mamba2 hybrid | 93.8% | 56MB (TP1), 14MB (TP4) | PASS |
+| Granite 4.0-H-small (32B) | IBM | Dense Mamba2 hybrid | — | ~146MB | PASS |
+| Codestral Mamba 7B | Mistral | **Pure Mamba2** | 67.1% | 260MB | **PASS (NEW)** |
+| Qwen3-Next-80B-A3B | Alibaba | Mamba2+Attn+MoE | 82.0% | 19MB (TP4) | **PASS (NEW)** |
+| Nemotron-Cascade-2-30B | NVIDIA | MoE Mamba2 hybrid | — | — | PASS |
+| Nemotron-3-Super-120B FP8 | NVIDIA | LatentMoE Mamba2 hybrid | — | — | BLOCKED (SM89+) |
+| Qwen3-Coder-Next FP8 | Alibaba | Gated Linear Attention + MoE | — | — | PASS |
 
 ## Quick Start
 

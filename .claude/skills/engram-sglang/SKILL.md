@@ -198,17 +198,22 @@ Engram additions:
 
 ## Model and compatibility notes
 
-| Model | Status | Notes |
-|-------|--------|-------|
-| Granite 4.0-H-tiny | PASS | Primary validation model |
-| Granite 4.0-H-small | PASS | Base model; use `/generate`, not chat-completions |
-| Nemotron-Cascade-2-30B | PASS | Hybrid/MoE validation path |
-| Nemotron-3-Super-120B FP8 | PASS | High-end H200 validation run |
-| Qwen3-Coder-Next FP8 | PASS | Important proof that the snapshot path is not Mamba2-only |
-| Mamba-Codestral-7B | INCOMPATIBLE today | Pure Mamba2 model class exists, but full runtime compatibility is still incomplete |
+| Model | Arch | Status | Token Reduction | Snapshot Size | Notes |
+|-------|------|--------|-----------------|---------------|-------|
+| Granite 4.0-H-tiny (4B) | Mamba2+Attn+MoE | PASS | 93.8% | 56MB (TP1), 14MB (TP4) | Primary validation model |
+| Granite 4.0-H-small | Mamba2+Attn+MoE | PASS | — | — | Base model; use `/generate`, not chat-completions |
+| Mamba-Codestral-7B | Pure Mamba2 | PASS | 67.1% | 260MB | **Upstream differentiator** — requires `--disable-cuda-graph --disable-piecewise-cuda-graph` |
+| Qwen3-Next-80B-A3B-Thinking | Mamba2+Attn+MoE | PASS | 82.0% | 19MB (TP4) | 80B total/3B active, 128+ tok/s on TP=4 |
+| Nemotron-Cascade-2-30B | Mamba2+Attn+MoE | PASS | — | — | Hybrid/MoE validation path |
+| Nemotron-3-Super-120B FP8 | Mamba2+Attn+MoE | BLOCKED | — | — | Requires SM89+ (H100/H200), fails on A100 |
+| Qwen3-Coder-Next FP8 | Different hybrid | PASS | — | — | Proof that snapshot path is not Mamba2-only |
 
-Critical compatibility finding:
-- The snapshot stack works for models whose recurrent state flows through SGLang's Mamba-style cache path, not only classic Mamba2 hybrids
+Key findings (engram-v0.2.0, validated 2026-04-08 on 4x A100 80GB):
+- All snapshots are constant-size regardless of context length (SSM state property)
+- TP=4 produces single aggregated snapshot file (state gathered to rank 0)
+- Zero VRAM leaks under sustained load (50+ requests) across all models
+- Snapshot restore in <60ms across all configurations
+- Pure Mamba2 support (Codestral) is an Engram-only capability — upstream SGLang PR submitted (sgl-project/sglang#22327)
 
 ## Current validation snapshot
 
