@@ -1306,7 +1306,9 @@ step_counter = 0
 
 
 def pytorch_profile(name, func, *args, data_size=-1):
-    """
+    """A utility for profiling PyTorch functions.
+
+    Uses torch.profiler to capture CPU/CUDA activity and export Chrome traces.
     Args:
         name (string): the name of recorded function.
         func: the function to be profiled.
@@ -1314,6 +1316,8 @@ def pytorch_profile(name, func, *args, data_size=-1):
         data_size (int): some measurement of the computation complexity.
             Usually, it could be the batch size.
     """
+    from torch.profiler import ProfilerActivity, profile, record_function
+
     global step_counter
     os.makedirs("trace", exist_ok=True)
     with profile(
