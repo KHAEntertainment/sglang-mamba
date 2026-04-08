@@ -199,12 +199,12 @@ def cmd_check_local_edits(args: argparse.Namespace) -> int:
     ]
     if missing_refs:
         print(
-            "Protected-path policy fallback: missing git ref(s) "
+            "Protected-path policy: skipping (missing git ref(s) "
             + ", ".join(missing_refs)
-            + ". Treating all candidate files as fork-owned because "
-            + f"{args.upstream_ref}...{args.fork_ref} cannot be compared."
+            + "). Cannot distinguish fork-owned files without "
+            + f"{args.upstream_ref}...{args.fork_ref}."
         )
-        fork_owned_files = set(candidate_files)
+        return 0
     else:
         try:
             fork_owned_files = set(
