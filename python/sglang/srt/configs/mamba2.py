@@ -121,15 +121,12 @@ class Mamba2Config(PretrainedConfig):
             **kwargs,
         )
 
-        # Mirror num_attention_heads onto hf_text_config after parent init
-        # so older code paths (ModelConfig.get_num_kv_heads(), hf_text_config)
-        # find the expected attributes even when cell_size == 0
-        if not hasattr(self, 'hf_text_config'):
-            # Create a minimal hf_text_config if it doesn't exist
-            class HFTextConfig:
-                pass
-            self.hf_text_config = HFTextConfig()
-        self.hf_text_config.num_attention_heads = self.num_attention_heads
+        # Pure SSM: num_key_value_heads == 0 so that cell_size computes to 0
+        self.num_key_value_heads = 0
+
+    @property
+    def mamba_chunk_size(self):
+        return self.chunk_size
 
     @property
     def layers_block_type(self):
