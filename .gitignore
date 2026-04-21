@@ -289,8 +289,8 @@ docs/migration-prep/
 # Runtime state files
 .remember/tmp/
 
-# Test phase run results (dev-generated, not test definitions)
-test/phases/results/
+# Test phase results — keep .md reports tracked, ignore raw data
+test/phases/results/*.json
 
 # VM-generated skills (local only)
 .claude/skills/
