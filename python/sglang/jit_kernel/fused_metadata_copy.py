@@ -8,6 +8,7 @@ and improving CUDA graph replay performance.
 The kernels are compiled on-demand using TVM FFI and cached for subsequent use.
 """
 
+# ENGRAM_MODIFIED — Mamba metadata kernel extensions
 from __future__ import annotations
 
 import logging
@@ -154,6 +155,7 @@ def fused_metadata_copy_cuda(
     has_real_page_table = real_page_table_src is not None
     has_flashmla = flashmla_num_splits_src is not None
 
+    # --- BEGIN ENGRAM: validate Engram-specific metadata copy preconditions ---
     # Validate that when src flag is set, corresponding dst tensor is provided
     if has_real_page_table and real_page_table_dst is None:
         raise ValueError(
@@ -173,6 +175,7 @@ def fused_metadata_copy_cuda(
                 f"seqlens_expanded_src and seqlens_expanded_dst are required "
                 f"for forward_mode={forward_mode} (TARGET_VERIFY/DRAFT_EXTEND)"
             )
+    # --- END ENGRAM ---
 
     # Get JIT-compiled module for this configuration (cached after first use)
     module = _jit_fused_metadata_copy_module(
@@ -188,6 +191,7 @@ def fused_metadata_copy_cuda(
     if seqlens_expanded_src is not None:
         seqlens_expanded_src = seqlens_expanded_src.contiguous()
     nsa_cu_seqlens_k_src = nsa_cu_seqlens_k_src.contiguous()
+    # --- BEGIN ENGRAM: preserve contiguous optional Mamba metadata tensors ---
     # Ensure optional tensors are contiguous if provided
     if real_page_table_src is not None:
         real_page_table_src = real_page_table_src.contiguous()
@@ -195,6 +199,7 @@ def fused_metadata_copy_cuda(
         flashmla_num_splits_src = flashmla_num_splits_src.contiguous()
     if flashmla_metadata_src is not None:
         flashmla_metadata_src = flashmla_metadata_src.contiguous()
+    # --- END ENGRAM ---
 
     # Call JIT-compiled kernel (None values are passed as Optional with no value)
     module.fused_metadata_copy(
@@ -302,6 +307,7 @@ def fused_metadata_copy_multi_cuda(
     page_indices_src = page_indices_src.contiguous()
     nsa_cache_seqlens_src = nsa_cache_seqlens_src.contiguous()
     nsa_cu_seqlens_k_src = nsa_cu_seqlens_k_src.contiguous()
+    # --- BEGIN ENGRAM: preserve contiguous optional Mamba metadata tensors ---
     # Ensure optional tensors are contiguous if provided
     if real_page_table_src is not None:
         real_page_table_src = real_page_table_src.contiguous()
@@ -309,6 +315,7 @@ def fused_metadata_copy_multi_cuda(
         flashmla_num_splits_src = flashmla_num_splits_src.contiguous()
     if flashmla_metadata_src is not None:
         flashmla_metadata_src = flashmla_metadata_src.contiguous()
+    # --- END ENGRAM ---
 
     # Call JIT-compiled kernel (None values are passed as Optional with no value)
     module.fused_metadata_copy_multi(

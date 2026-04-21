@@ -13,6 +13,8 @@
 # ==============================================================================
 """Utilities for Huggingface Transformers."""
 
+# ENGRAM_MODIFIED — Mamba2Config registry entry
+
 import contextlib
 import json
 import logging
@@ -80,7 +82,9 @@ from sglang.srt.configs import (
     KimiLinearConfig,
     KimiVLConfig,
     LongcatFlashConfig,
+    # --- BEGIN ENGRAM: Mamba2 config registration ---
     Mamba2Config,
+    # --- END ENGRAM ---
     MultiModalityConfig,
     NemotronH_Nano_VL_V2_Config,
     NemotronHConfig,
@@ -110,7 +114,9 @@ _CONFIG_REGISTRY: List[Type[PretrainedConfig]] = [
     InternVLChatConfig,
     Step3VLConfig,
     LongcatFlashConfig,
+    # --- BEGIN ENGRAM: Mamba2 config registration ---
     Mamba2Config,
+    # --- END ENGRAM ---
     Olmo3Config,
     KimiLinearConfig,
     Qwen3NextConfig,

@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: PR Test (SMG)
 
 on:
@@ -24,7 +25,9 @@ env:
 jobs:
   build-wheel:
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       (github.event_name != 'pull_request' ||
       (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'run-ci')) ||
       (github.event.action == 'labeled' && github.event.label.name == 'run-ci'))
@@ -78,7 +81,9 @@ jobs:
           python3 -m sglang_router.launch_router --help > /dev/null && echo "Entry point: OK"
 
   python-unit-tests:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: build-wheel
     runs-on: ubuntu-latest
     steps:
@@ -113,7 +118,9 @@ jobs:
 
   unit-tests:
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       (github.event_name != 'pull_request' ||
       (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'run-ci')) ||
       (github.event.action == 'labeled' && github.event.label.name == 'run-ci'))
@@ -180,7 +187,9 @@ jobs:
     name: ${{ matrix.name }}
     needs: build-wheel
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       (github.event_name != 'pull_request' ||
       (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'run-ci')) ||
       (github.event.action == 'labeled' && github.event.label.name == 'run-ci'))
@@ -317,7 +326,9 @@ jobs:
 
   docker-build-test:
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       (github.event_name != 'pull_request' ||
       (github.event.action != 'labeled' && contains(github.event.pull_request.labels.*.name, 'run-ci')) ||
       (github.event.action == 'labeled' && github.event.label.name == 'run-ci'))
@@ -340,7 +351,9 @@ jobs:
           cache-to: type=gha,mode=max
 
   finish:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && always()
+    # --- END ENGRAM ---
     needs: [build-wheel, python-unit-tests, unit-tests, gateway-e2e, docker-build-test]
     runs-on: ubuntu-latest
     steps:
@@ -350,7 +363,9 @@ jobs:
   summarize-benchmarks:
     needs: gateway-e2e
     runs-on: ubuntu-latest
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && success()
+    # --- END ENGRAM ---
 
     steps:
     - name: Checkout code

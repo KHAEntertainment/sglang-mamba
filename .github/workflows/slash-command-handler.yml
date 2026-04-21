@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: Slash Command Handler
 
 on:
@@ -15,7 +16,9 @@ jobs:
     # Only run if it is a PR and the comment contains a recognized command
     # Use contains() since startsWith() can't handle leading whitespace/newlines
     if: >
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       github.event.issue.pull_request &&
       (contains(github.event.comment.body, '/tag-run-ci-label') ||
        contains(github.event.comment.body, '/rerun-failed-ci') ||

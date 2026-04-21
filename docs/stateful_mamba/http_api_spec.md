@@ -1,3 +1,4 @@
+<!-- ENGRAM_MODIFIED — Snapshot HTTP API specification -->
 # Engram HTTP API Spec
 
 Canonical technical draft for Engram's snapshot and statefulness HTTP surface.

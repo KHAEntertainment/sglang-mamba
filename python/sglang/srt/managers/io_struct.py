@@ -16,6 +16,8 @@ The definition of objects transferred between different
 processes (TokenizerManager, DetokenizerManager, Scheduler).
 """
 
+# ENGRAM_MODIFIED — Snapshot and agent request/response data structures
+
 from __future__ import annotations
 
 import copy
@@ -758,8 +760,10 @@ class TokenizedGenerateReqInput(BaseReq):
     # For observability
     time_stats: Optional[Union[APIServerReqTimeStats, DPControllerReqTimeStats]] = None
 
+    # --- BEGIN ENGRAM: conversation grouping for snapshots ---
     # Conversation id for snapshot grouping across turns
     conversation_id: Optional[str] = None
+    # --- END ENGRAM ---
 
 
 @dataclass
@@ -824,8 +828,10 @@ class EmbeddingReqInput(BaseReq):
     # The uid of LoRA adaptors, should be initialized by tokenizer manager
     lora_id: Optional[Union[List[Optional[str]], Optional[str]]] = None
 
+    # --- BEGIN ENGRAM: continual prompting session parameters ---
     # Session info for continual prompting
     session_params: Optional[Union[List[Dict], Dict]] = None
+    # --- END ENGRAM ---
 
     def normalize_batch_and_arguments(self):
         # at least one of text, input_ids, or image should be provided
@@ -2016,6 +2022,7 @@ def _check_all_req_types():
             )
 
 
+# --- BEGIN ENGRAM: snapshot request and response payloads ---
 @dataclass
 class SaveSnapshotReqInput(BaseReq):
     """Request to save a Mamba state snapshot."""
@@ -2138,6 +2145,7 @@ class DeleteSnapshotReqOutput(BaseReq):
 
     success: bool = False
     message: Optional[str] = None
+# --- END ENGRAM ---
 
 
 _check_all_req_types()

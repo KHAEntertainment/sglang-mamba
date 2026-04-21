@@ -1,3 +1,4 @@
+<!-- ENGRAM_MODIFIED — Engram fork security policy and disclosure process -->
 # Security Policy
 
 ## Supported Versions

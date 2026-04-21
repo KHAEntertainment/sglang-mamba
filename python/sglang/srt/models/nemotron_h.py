@@ -15,6 +15,8 @@
 
 """Inference-only NemotronH model."""
 
+# ENGRAM_MODIFIED — Mamba state hooks for Nemotron-H
+
 from collections.abc import Iterable
 from typing import Optional, Union
 
@@ -912,6 +914,8 @@ def nemotron_mamba2_with_output(
 
     # Copy result back; output may be larger (padded) so only fill actual tokens
     output[:num_actual_tokens].view(ret.shape).copy_(ret)
+    # --- BEGIN ENGRAM: zero padded Nemotron-H Mamba outputs ---
     if output.shape[0] > num_actual_tokens:
         output[num_actual_tokens:].zero_()
+    # --- END ENGRAM ---
     return

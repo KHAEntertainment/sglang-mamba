@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: Nightly Test (AMD)
 
 on:
@@ -104,7 +105,9 @@ jobs:
   # ============================================== MI30x Unit Tests ==============================================
   # 1-GPU Unit Tests - LoRA, debug utils, scheduler, etc. (MI30x only)
   nightly-test-1-gpu-unit:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-test-1-gpu-unit,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-1gpu-sglang
     steps:
       - name: Checkout code
@@ -134,7 +137,9 @@ jobs:
   # ============================================== MI30x Accuracy Tests ==============================================
   # 2-GPU Accuracy Tests - GSM8K eval (MI30x only)
   nightly-accuracy-2-gpu:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-accuracy-2-gpu,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-2gpu-sglang
     steps:
       - name: Checkout code
@@ -163,7 +168,9 @@ jobs:
 
   # 2-GPU VLM Accuracy Tests - Vision-Language Models MMMU evaluation
   nightly-accuracy-2-gpu-vlm:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-accuracy-2-gpu-vlm,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-2gpu-sglang
     steps:
       - name: Checkout code
@@ -193,7 +200,9 @@ jobs:
 
   # 2-GPU Text Models Performance Tests
   nightly-perf-2-gpu-text:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-perf-2-gpu-text,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-2gpu-sglang
     steps:
       - name: Checkout code
@@ -224,7 +233,9 @@ jobs:
 
   # 2-GPU VLM Performance Tests
   nightly-perf-2-gpu-vlm:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-perf-2-gpu-vlm,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-2gpu-sglang
     steps:
       - name: Checkout code
@@ -256,7 +267,9 @@ jobs:
   # ============================================== MI30x 4-GPU Tests ==============================================
   # 4-GPU Nightly Tests - Dumper/Comparator E2E, VLM Encoder DP
   nightly-4-gpu:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-4-gpu,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-4gpu-sglang
     steps:
       - name: Checkout code
@@ -286,7 +299,9 @@ jobs:
 
   # 8-GPU Accuracy Tests - GPT-OSS, Grok1-FP8 (accuracy only)
   nightly-accuracy-8-gpu:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-accuracy-8-gpu,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -326,7 +341,9 @@ jobs:
   # ============================================== MI30x Combined Accuracy + Performance Tests ==============================================
   # 8-GPU Grok1-INT4 (Accuracy + Performance combined)
   nightly-8-gpu-grok1-int4:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-grok1-int4,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -369,7 +386,9 @@ jobs:
 
   # 8-GPU Grok2 (Accuracy + Performance combined)
   nightly-8-gpu-grok2:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-grok2,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -412,7 +431,9 @@ jobs:
 
   # 8-GPU DeepSeek-V3.1 (Accuracy + Performance combined)
   nightly-8-gpu-deepseek-v31:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-deepseek-v31,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -455,7 +476,9 @@ jobs:
 
   # 8-GPU DeepSeek-V3.2 (Basic Accuracy + Perf)
   nightly-8-gpu-deepseek-v32:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-deepseek-v32,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -496,7 +519,9 @@ jobs:
 
   # 8-GPU DeepSeek-V3.2 MTP (MTP Accuracy + Perf)
   nightly-8-gpu-deepseek-v32-mtp:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-deepseek-v32-mtp,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -537,7 +562,9 @@ jobs:
 
   # 8-GPU DeepSeek-V3 KV FP8 (Basic + MTP with --kv-cache-dtype fp8_e4m3)
   nightly-8-gpu-deepseek-v3-kv-fp8:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-deepseek-v3-kv-fp8,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -567,7 +594,9 @@ jobs:
 
   # 8-GPU Kimi-K2.5 (Accuracy)
   nightly-8-gpu-kimi-k25:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-kimi-k25,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -596,7 +625,9 @@ jobs:
           exit ${TEST_EXIT_CODE:-0}
 
   nightly-8-gpu-qwen3-235b:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-qwen3-235b,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -626,7 +657,9 @@ jobs:
 
   # 8-GPU Qwen 3.5 (Accuracy + Performance combined)
   nightly-8-gpu-qwen35:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-qwen35,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -669,7 +702,9 @@ jobs:
           exit ${TEST_EXIT_CODE:-0}
 
   nightly-8-gpu-glm5:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-glm5,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -701,7 +736,9 @@ jobs:
 
   # 8-GPU MiniMax-M2.5 (Accuracy + Performance combined)
   nightly-8-gpu-minimax-m25:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-minimax-m25,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-8gpu-sglang
     steps:
       - name: Checkout code
@@ -745,7 +782,9 @@ jobs:
   # ============================================== MI30x Diffusion Tests ==============================================
   # 1-GPU Z-Image-Turbo (Diffusion T2I)
   nightly-1-gpu-zimage-turbo:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-1-gpu-zimage-turbo,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi325-1gpu-sglang
     steps:
       - name: Checkout code
@@ -785,7 +824,9 @@ jobs:
   # ============================================== MI35x Tests ==============================================
   # MI35x 1-GPU tests - platform-agnostic tests that may work on CDNA4 (gfx950)
   nightly-test-1-gpu-mi35x:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-test-1-gpu-mi35x,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-1
     steps:
       - name: Checkout code
@@ -817,7 +858,9 @@ jobs:
 
   # MI35x 8-GPU Accuracy Tests - GPT-OSS (accuracy only)
   nightly-accuracy-8-gpu-mi35x:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-accuracy-8-gpu-mi35x,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -849,7 +892,9 @@ jobs:
 
   # MI35x 8-GPU Grok1-INT4 (Accuracy + Performance combined)
   nightly-8-gpu-mi35x-grok1-int4:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-mi35x-grok1-int4,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -895,7 +940,9 @@ jobs:
 
   # MI35x 8-GPU Grok2 (Accuracy + Performance combined)
   nightly-8-gpu-mi35x-grok2:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-mi35x-grok2,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -941,7 +988,9 @@ jobs:
 
   # MI35x 8-GPU DeepSeek-R1-MXFP4 (Accuracy + Performance combined)
   nightly-8-gpu-mi35x-deepseek-r1-mxfp4:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-mi35x-deepseek-r1-mxfp4,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -985,7 +1034,9 @@ jobs:
 
   # MI35x 8-GPU DeepSeek-R1-MXFP4 KV FP8 (Accuracy + Performance combined)
   nightly-8-gpu-mi35x-deepseek-r1-mxfp4-kv-fp8:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-mi35x-deepseek-r1-mxfp4-kv-fp8,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -1029,7 +1080,9 @@ jobs:
 
   # MI35x 8-GPU DeepSeek-R1-MXFP4 AllReduce Fusion (Accuracy + Performance combined)
   nightly-8-gpu-mi35x-deepseek-r1-mxfp4-ar-fusion:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-mi35x-deepseek-r1-mxfp4-ar-fusion,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -1073,7 +1126,9 @@ jobs:
 
   # MI35x 8-GPU DeepSeek-V3.2 Accuracy Test
   nightly-accuracy-8-gpu-mi35x-deepseek-v32:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-accuracy-8-gpu-mi35x-deepseek-v32,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -1106,7 +1161,9 @@ jobs:
 
   # MI35x 8-GPU DeepSeek-V3.2 TP+MTP Accuracy Test
   nightly-accuracy-8-gpu-mi35x-deepseek-v32-mtp:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-accuracy-8-gpu-mi35x-deepseek-v32-mtp,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -1139,7 +1196,9 @@ jobs:
 
   # MI35x 8-GPU DeepSeek-V3.2 Performance Test (Basic)
   nightly-perf-8-gpu-mi35x-deepseek-v32-basic:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-perf-8-gpu-mi35x-deepseek-v32-basic,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -1172,7 +1231,9 @@ jobs:
 
   # MI35x 8-GPU Kimi-K2.5 (Accuracy)
   nightly-8-gpu-mi35x-kimi-k25:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-mi35x-kimi-k25,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -1205,7 +1266,9 @@ jobs:
 
   # MI35x 8-GPU Qwen3-235B-MXFP4 (Accuracy + Performance)
   nightly-8-gpu-mi35x-qwen3-235b-mxfp4:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-mi35x-qwen3-235b-mxfp4,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -1238,7 +1301,9 @@ jobs:
 
   # MI35x 8-GPU Qwen 3.5 (Accuracy + Performance combined)
   nightly-8-gpu-mi35x-qwen35:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-mi35x-qwen35,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -1282,7 +1347,9 @@ jobs:
           exit ${TEST_EXIT_CODE:-0}
 
   nightly-8-gpu-mi35x-glm5:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-mi35x-glm5,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -1316,7 +1383,9 @@ jobs:
 
   # MI35x 8-GPU MiniMax-M2.5 (Accuracy + Performance combined)
   nightly-8-gpu-mi35x-minimax-m25:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-8-gpu-mi35x-minimax-m25,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -1361,7 +1430,9 @@ jobs:
 
   # MI35x 8-GPU DeepSeek-V3.2 Performance Test (MTP)
   nightly-perf-8-gpu-mi35x-deepseek-v32-mtp:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: (github.repository == 'sgl-project/sglang') && (!(inputs.job_filter || inputs.job_select) || (inputs.job_filter || inputs.job_select) == 'all' || contains(format(',{0},', inputs.job_filter || inputs.job_select), ',nightly-perf-8-gpu-mi35x-deepseek-v32-mtp,'))
+    # --- END ENGRAM ---
     runs-on: linux-mi35x-gpu-8
     steps:
       - name: Checkout code
@@ -1393,7 +1464,9 @@ jobs:
           exit ${TEST_EXIT_CODE:-0}
 
   check-all-jobs:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: always() && (github.repository == 'sgl-project/sglang')
+    # --- END ENGRAM ---
     needs:
       # MI30x Unit Tests
       - nightly-test-1-gpu-unit

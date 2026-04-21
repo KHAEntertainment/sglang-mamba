@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: AMD AITER Scout
 
 on:
@@ -28,7 +29,9 @@ concurrency:
 
 jobs:
   resolve-aiter:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     outputs:
       aiter_sha: ${{ steps.resolve.outputs.sha }}
@@ -84,7 +87,9 @@ jobs:
           echo "- **Filter:** \`${FILTER}\`" >> $GITHUB_STEP_SUMMARY
 
   call-nightly-amd:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.resolve-aiter.outputs.run_nightly_amd == 'true'
+    # --- END ENGRAM ---
     needs: resolve-aiter
     uses: ./.github/workflows/nightly-test-amd.yml
     secrets: inherit
@@ -95,7 +100,9 @@ jobs:
       continue_on_error: ${{ inputs.continue_on_error == '' && true || inputs.continue_on_error }}
 
   call-nightly-amd-rocm720:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.resolve-aiter.outputs.run_nightly_amd_rocm720 == 'true'
+    # --- END ENGRAM ---
     needs: resolve-aiter
     uses: ./.github/workflows/nightly-test-amd-rocm720.yml
     secrets: inherit
@@ -106,7 +113,9 @@ jobs:
       continue_on_error: ${{ inputs.continue_on_error == '' && true || inputs.continue_on_error }}
 
   call-pr-test-amd:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.resolve-aiter.outputs.run_pr_test_amd == 'true'
+    # --- END ENGRAM ---
     needs: resolve-aiter
     uses: ./.github/workflows/pr-test-amd.yml
     secrets: inherit
@@ -116,7 +125,9 @@ jobs:
       continue_on_error: ${{ inputs.continue_on_error == '' && true || inputs.continue_on_error }}
 
   call-pr-test-amd-rocm720:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.resolve-aiter.outputs.run_pr_test_amd_rocm720 == 'true'
+    # --- END ENGRAM ---
     needs: resolve-aiter
     uses: ./.github/workflows/pr-test-amd-rocm720.yml
     secrets: inherit
@@ -126,7 +137,9 @@ jobs:
       continue_on_error: ${{ inputs.continue_on_error == '' && true || inputs.continue_on_error }}
 
   check-all-jobs:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && always()
+    # --- END ENGRAM ---
     needs:
       - resolve-aiter
       - call-nightly-amd

@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — Benchmark adaptation for Mamba
 import argparse
 import asyncio
 import json
@@ -381,6 +382,7 @@ class WorkloadGenerator:
                 }
         self.num_clients = args.num_clients
 
+        # ENGRAM_CHANGED: Engram benchmarks carry LoRA state and use the configured round count directly.
         self.lora_path = args.lora_path
         self.num_rounds = args.num_rounds
         self.max_parallel = args.max_parallel
@@ -519,6 +521,7 @@ class WorkloadGenerator:
                 # Barrier logic: release next round when all clients for
                 # current barrier round have completed
                 if (
+                    # ENGRAM_CHANGED: Engram barrier completion tracks configured rounds and active clients.
                     self.enable_round_barrier
                     and current_barrier_round < self.num_rounds
                 ):

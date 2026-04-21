@@ -3,6 +3,7 @@ Usage:
 python3 -m sglang.test.run_eval --port 30000 --eval-name mmlu --num-examples 10
 """
 
+# ENGRAM_MODIFIED — Test runner adaptation
 import argparse
 import json
 import os
@@ -132,6 +133,7 @@ def run_eval(args):
     elif args.eval_name == "gpqa":
         from sglang.test.simple_eval_gpqa import GPQAEval
 
+        # ENGRAM_CHANGED: Engram lets GPQA runs override the default dataset path safely.
         filename = getattr(args, "dataset_path", None) or (
             "https://openaipublic.blob.core.windows.net/simple-evals/gpqa_diamond.csv"
         )
@@ -144,6 +146,7 @@ def run_eval(args):
         from sglang.test.simple_eval_longbench_v2 import LongBenchV2Eval
 
         # Default to HuggingFace dataset, can be overridden with --dataset-path
+        # ENGRAM_CHANGED: Engram tolerates eval args that omit dataset_path.
         data_source = getattr(args, "dataset_path", None)
         categories = args.categories.split(",") if args.categories else None
 

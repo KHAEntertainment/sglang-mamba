@@ -13,13 +13,17 @@
 # ==============================================================================
 """A scheduler that manages a tensor parallel GPU worker."""
 
+# ENGRAM_MODIFIED — Mamba state management, snapshot save/restore, conversation tracking
+
 import faulthandler
 import logging
 import os
 import signal
 import sys
 import time
+# --- BEGIN ENGRAM: snapshot restore request IDs ---
 import uuid
+# --- END ENGRAM ---
 from collections import deque
 from contextlib import nullcontext
 from dataclasses import dataclass
@@ -97,7 +101,9 @@ from sglang.srt.managers.io_struct import (
     ClearHiCacheReqOutput,
     CloseSessionReqInput,
     ContinueGenerationReqInput,
+    # --- BEGIN ENGRAM: snapshot request routing ---
     DeleteSnapshotReqInput,
+    # --- END ENGRAM ---
     DestroyWeightsUpdateGroupReqInput,
     DetachHiCacheStorageReqInput,
     DetachHiCacheStorageReqOutput,
@@ -113,7 +119,9 @@ from sglang.srt.managers.io_struct import (
     GetInternalStateReqOutput,
     GetLoadReqInput,
     GetLoadsReqInput,
+    # --- BEGIN ENGRAM: snapshot request routing ---
     GetSnapshotInfoReqInput,
+    # --- END ENGRAM ---
     GetWeightsByNameReqInput,
     HealthCheckOutput,
     InitWeightsSendGroupForRemoteInstanceReqInput,
@@ -121,7 +129,9 @@ from sglang.srt.managers.io_struct import (
     InitWeightsUpdateGroupReqInput,
     ListExternalCorporaReqInput,
     ListExternalCorporaReqOutput,
+    # --- BEGIN ENGRAM: snapshot request routing ---
     ListSnapshotsReqInput,
+    # --- END ENGRAM ---
     LoadLoRAAdapterFromTensorsReqInput,
     LoadLoRAAdapterFromTensorsReqOutput,
     LoadLoRAAdapterReqInput,
@@ -132,11 +142,15 @@ from sglang.srt.managers.io_struct import (
     ReleaseMemoryOccupationReqInput,
     RemoveExternalCorpusReqInput,
     RemoveExternalCorpusReqOutput,
+    # --- BEGIN ENGRAM: snapshot request routing ---
     RestoreSnapshotReqInput,
+    # --- END ENGRAM ---
     ResumeMemoryOccupationReqInput,
     RpcReqInput,
     RpcReqOutput,
+    # --- BEGIN ENGRAM: snapshot request routing ---
     SaveSnapshotReqInput,
+    # --- END ENGRAM ---
     SendWeightsToRemoteInstanceReqInput,
     SendWeightsToRemoteInstanceReqOutput,
     SetInternalStateReq,
@@ -344,10 +358,12 @@ class Scheduler(
         self.enable_overlap = not server_args.disable_overlap_schedule
         self.enable_pdmux = server_args.enable_pdmux
         self.skip_tokenizer_init = server_args.skip_tokenizer_init
+        # --- BEGIN ENGRAM: scheduler metrics configuration ---
         self.enable_metrics = server_args.enable_metrics
         self.enable_metrics_for_all_schedulers = (
             server_args.enable_metrics_for_all_schedulers
         )
+        # --- END ENGRAM ---
         self.stream_interval = server_args.stream_interval
         self.spec_algorithm = SpeculativeAlgorithm.from_string(
             server_args.speculative_algorithm
@@ -406,11 +422,13 @@ class Scheduler(
         # Init cache and memory pool
         self.init_cache_with_memory_pool()
 
+        # --- BEGIN ENGRAM: snapshot and agent subsystems ---
         # Init snapshot system (for Mamba state persistence)
         self.init_snapshot_system()
 
         # Init agent system (for tool-calling framework)
         self.init_agent_system()
+        # --- END ENGRAM ---
 
         # Init running status
         self.init_running_status()
@@ -874,6 +892,7 @@ class Scheduler(
         embedding_cache_size = envs.SGLANG_VLM_CACHE_SIZE_MB.get()
         init_mm_embedding_cache(embedding_cache_size * 1024 * 1024)
 
+    # --- BEGIN ENGRAM: snapshot system initialization and startup restore ---
     def init_snapshot_system(self):
         """
         Initialize the Mamba state snapshot system for stateful inference.
@@ -1190,7 +1209,9 @@ class Scheduler(
         # Restore snapshots if auto-restore is enabled
         if server_args.snapshot_auto_restore:
             self.restore_snapshots_on_startup()
+    # --- END ENGRAM ---
 
+    # --- BEGIN ENGRAM: snapshot save, list, info, restore, and eviction handlers ---
     def restore_snapshots_on_startup(self):
         """
         Restore the latest snapshots for all conversations on server startup.
@@ -1935,7 +1956,9 @@ class Scheduler(
 
         except Exception as e:
             logger.error(f"Error handling Mamba state eviction: {e}", exc_info=True)
+    # --- END ENGRAM ---
 
+    # --- BEGIN ENGRAM: agent tool framework initialization ---
     def init_agent_system(self):
         """
         Initialize the agent framework for tool-calling support.
@@ -2004,6 +2027,7 @@ class Scheduler(
             self.tool_registry = None
             self.tool_parser = None
             self.tool_executor = None
+    # --- END ENGRAM ---
 
     def init_running_status(self):
         self.waiting_queue: List[Req] = []
@@ -2416,11 +2440,13 @@ class Scheduler(
                 (GetLoadsReqInput, self.get_loads),
                 (PauseGenerationReqInput, self.pause_generation),
                 (ContinueGenerationReqInput, self.continue_generation),
+                # --- BEGIN ENGRAM: snapshot request handlers ---
                 (SaveSnapshotReqInput, self.handle_save_snapshot),
                 (ListSnapshotsReqInput, self.handle_list_snapshots),
                 (GetSnapshotInfoReqInput, self.handle_get_snapshot_info),
                 (RestoreSnapshotReqInput, self.handle_restore_snapshot),
                 (DeleteSnapshotReqInput, self.handle_delete_snapshot),
+                # --- END ENGRAM ---
                 (DumperControlReqInput, self.handle_dumper_control),
                 (AddExternalCorpusReqInput, self.add_external_corpus),
                 (
@@ -2953,7 +2979,9 @@ class Scheduler(
                 http_worker_ipc=recv_req.http_worker_ipc,
                 dllm_config=self.dllm_config,
                 time_stats=recv_req.time_stats,
+                # --- BEGIN ENGRAM: conversation tracking on requests ---
                 conversation_id=getattr(recv_req, "conversation_id", None),
+                # --- END ENGRAM ---
             )
             req.tokenizer = self.tokenizer
 
@@ -4007,12 +4035,15 @@ class Scheduler(
         elif batch.forward_mode.is_idle():
             self.process_batch_result_idle(batch, result)
 
+        # --- BEGIN ENGRAM: automatic snapshot hook triggering ---
         self._trigger_snapshot_hooks(batch)
+        # --- END ENGRAM ---
 
         self.log_batch_result_stats(batch, result)
         self._maybe_clear_mm_inputs(batch)
         self.maybe_send_health_check_signal()
 
+    # --- BEGIN ENGRAM: post-forward snapshot hook runner ---
     def _trigger_snapshot_hooks(self, batch: ScheduleBatch):
         """
         Trigger snapshot hooks for all requests in the batch.
@@ -4048,6 +4079,7 @@ class Scheduler(
                 turn_number=turn_number,
                 additional_context=None,
             )
+    # --- END ENGRAM ---
 
     def maybe_send_health_check_signal(self):
         if self.return_health_check_ipcs:

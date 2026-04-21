@@ -13,6 +13,8 @@
 # ==============================================================================
 """Common utilities."""
 
+# ENGRAM_MODIFIED — Snapshot utility functions
+
 from __future__ import annotations
 
 import argparse
@@ -197,9 +199,11 @@ def is_mps() -> bool:
     return torch.backends.mps.is_available()
 
 
+# --- BEGIN ENGRAM: NUMA lookup shim ---
 def get_numa_node(gpu_id):
     """Return the NUMA node for gpu_id, or None if unavailable."""
     return None
+# --- END ENGRAM ---
 
 
 def is_float4_e2m1fn_x2(dtype) -> bool:
@@ -1302,6 +1306,7 @@ def point_to_point_pyobj(
     return []
 
 
+# --- BEGIN ENGRAM: PyTorch profiling and compile helpers ---
 step_counter = 0
 
 
@@ -1368,6 +1373,7 @@ def maybe_torch_compile(*args, **kwargs):
         return func
 
     return decorator
+# --- END ENGRAM ---
 
 
 def delete_directory(dirpath):

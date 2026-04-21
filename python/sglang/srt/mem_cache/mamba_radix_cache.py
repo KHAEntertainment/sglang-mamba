@@ -19,6 +19,8 @@ limitations under the License.
 The radix tree data structure for managing the hybrid (full and Mamba) KV cache.
 """
 
+# ENGRAM_MODIFIED — Mamba radix cache extensions
+
 import heapq
 from collections import defaultdict
 from functools import lru_cache, partial
@@ -471,9 +473,11 @@ class MambaRadixCache(BasePrefixCache):
         # LRU lists are used to maintain the order of eviction of the nodes in the tree
         self.full_lru_list = LRUList(mamba=False)
         self.mamba_lru_list = LRUList(mamba=True)
+        # --- BEGIN ENGRAM: observable cache hit and miss counters ---
         # Observable hit/miss counters — incremented on every match_prefix call
         self.hit_tokens = 0
         self.miss_tokens = 0
+        # --- END ENGRAM ---
 
     def match_prefix(self, params: MatchPrefixParams) -> MatchResult:
         """Find the matching prefix from the radix tree.
@@ -499,9 +503,11 @@ class MambaRadixCache(BasePrefixCache):
             )
 
         value, last_node, best_value_len = self._match_prefix_helper(key)
+        # --- BEGIN ENGRAM: observable cache hit and miss accounting ---
         # Increment observable counters so callers can assert cache activity.
         self.hit_tokens += best_value_len
         self.miss_tokens += max(0, len(params.key) - best_value_len)
+        # --- END ENGRAM ---
         return self._match_post_processor(params, value, last_node, best_value_len)
 
     def insert(self, params: InsertParams) -> InsertResult:
@@ -908,6 +914,7 @@ class MambaRadixCache(BasePrefixCache):
         # Note: use full_evictable_size() and mamba_evictable_size() instead.
         raise NotImplementedError
 
+    # --- BEGIN ENGRAM: cache availability debug string ---
     def available_and_evictable_str(self) -> str:
         full_available_size = self.token_to_kv_pool_allocator.available_size()
         full_evictable_size = self.full_evictable_size()
@@ -915,6 +922,7 @@ class MambaRadixCache(BasePrefixCache):
             f"Available full tokens: {full_available_size + full_evictable_size} ({full_available_size=} + {full_evictable_size=})\n"
             f"Full LRU list evictable size: {self.full_lru_list.sanity_check_evictable_size()}\n"
         )
+    # --- END ENGRAM ---
 
     def full_evictable_size(self) -> int:
         return self.full_evictable_size_

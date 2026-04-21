@@ -1,8 +1,10 @@
+# ENGRAM_MODIFIED — Kernel fork tweak
 from typing import Optional, Tuple
 
 import torch
 
 try:
+    # ENGRAM_CHANGED: Engram skips extension registration import in this forked kernel path.
     pass  # triggers TORCH extension registration
 except Exception as _e:
     _flashmla_import_error = _e

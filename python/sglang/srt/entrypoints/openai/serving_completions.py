@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# ENGRAM_MODIFIED — Snapshot passthrough in completions
+
 import logging
 import time
 from http import HTTPStatus
@@ -123,7 +125,9 @@ class OpenAIServingCompletion(OpenAIServingBase):
             return_hidden_states=request.return_hidden_states,
             return_routed_experts=request.return_routed_experts,
             rid=request.rid,
+            # --- BEGIN ENGRAM: completion conversation ID passthrough ---
             conversation_id=request.conversation_id,
+            # --- END ENGRAM ---
             extra_key=self._compute_extra_key(request),
             priority=request.priority,
             routing_key=self.extract_routing_key(raw_request),

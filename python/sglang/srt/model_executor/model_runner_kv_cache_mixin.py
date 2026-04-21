@@ -1,3 +1,5 @@
+# ENGRAM_MODIFIED — KV cache Mamba state integration
+
 from __future__ import annotations
 
 import logging
@@ -172,6 +174,7 @@ class ModelRunnerKVCacheMixin:
             1 - self.mem_fraction_static
         )
 
+        # --- BEGIN ENGRAM: pure SSM token-capacity sizing ---
         if cell_size == 0:
             # Pure SSM model with no attention layers — KV cache is not the
             # limiting factor. Compute token capacity based on Mamba state
@@ -192,10 +195,12 @@ class ModelRunnerKVCacheMixin:
                 # Fallback: if no Mamba config, use available memory with a
                 # conservative per-token estimate
                 return int(rest_memory * (1 << 30) // 2)
+        # --- END ENGRAM ---
 
         if self.mambaish_config is not None:
             rest_memory = self.handle_max_mamba_cache(rest_memory)
 
+        # --- BEGIN ENGRAM: pure SSM token-pool slot sizing ---
         if cell_size == 0:
             # Pure SSM model with no attention layers — the KV token pool is
             # empty so its slot count is not the memory bottleneck.  Mamba state
@@ -204,6 +209,7 @@ class ModelRunnerKVCacheMixin:
             # max_mamba_cache_size // ratio.  Return a large fixed count so the
             # token pool allocator succeeds without wasting real memory.
             return 1 << 20  # 1M token slots
+        # --- END ENGRAM ---
 
         return int(rest_memory * (1 << 30)) // cell_size
 

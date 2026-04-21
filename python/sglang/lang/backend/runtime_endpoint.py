@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — Snapshot API client
 import atexit
 import json
 import multiprocessing
@@ -339,6 +340,7 @@ class RuntimeEndpoint(BaseBackend):
             assert len(s.images_) == 1, "Only support one image."
             data["image_data"] = s.images_[0][1]
 
+    # --- BEGIN ENGRAM: snapshot HTTP client methods ---
     def save_snapshot(
         self,
         rid: str,
@@ -445,6 +447,7 @@ class RuntimeEndpoint(BaseBackend):
         )
         self._assert_success(res)
         return res.json()
+    # --- END ENGRAM ---
 
     def _assert_success(self, res):
         if res.status_code != 200:

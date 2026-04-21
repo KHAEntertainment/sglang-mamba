@@ -1,3 +1,4 @@
+<!-- ENGRAM_MODIFIED — Engram snapshot architecture overview -->
 # Engram Architecture
 
 This document describes the implementation that exists today for the Engram

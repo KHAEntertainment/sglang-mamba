@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: Release SGLang Kernels
 
 on:
@@ -36,7 +37,9 @@ concurrency:
 jobs:
   build-cu129-matrix:
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       (github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'cu129')
     strategy:
       matrix:
@@ -82,7 +85,9 @@ jobs:
           path: sgl-kernel/dist/*
 
   release-cu129:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: build-cu129-matrix
     runs-on: ubuntu-latest
     steps:
@@ -136,7 +141,9 @@ jobs:
   # for now we do not release CUDA 13.0 wheels to pypi
   build-cu130-matrix:
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       (github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'cu130')
     strategy:
       matrix:
@@ -176,7 +183,9 @@ jobs:
           path: sgl-kernel/dist/*
 
   release-cu130:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: build-cu130-matrix
     runs-on: ubuntu-latest
     steps:
@@ -229,7 +238,9 @@ jobs:
 
   build-rocm-matrix:
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       (github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'rocm700' || github.event.inputs.target == 'rocm720')
     runs-on: amd-docker-scale
     strategy:
@@ -261,7 +272,9 @@ jobs:
           path: sgl-kernel/dist/*
 
   release-rocm700:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: build-rocm-matrix
     runs-on: ubuntu-latest
     steps:
@@ -313,7 +326,9 @@ jobs:
           git push
 
   release-rocm720:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: build-rocm-matrix
     runs-on: ubuntu-latest
     steps:
@@ -366,7 +381,9 @@ jobs:
 
   build-musa43:
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       (github.event_name == 'push' || github.event.inputs.target == 'all' || github.event.inputs.target == 'musa43')
     runs-on: kernel-build-node-musa
     strategy:
@@ -395,7 +412,9 @@ jobs:
           path: sgl-kernel/dist/*
 
   release-musa43:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: build-musa43
     runs-on: ubuntu-latest
     steps:

@@ -1,3 +1,4 @@
+<!-- ENGRAM_MODIFIED — Engram agent configuration and multi-agent framework -->
 # AGENTS.md — Engram
 
 **Engram** (formerly **sglang-mamba**) is a fork of

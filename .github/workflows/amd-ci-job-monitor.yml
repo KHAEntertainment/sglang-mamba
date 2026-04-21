@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: AMD CI Job Monitor
 
 on:
@@ -21,7 +22,9 @@ on:
 
 jobs:
   fetch-actions-data:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     name: Fetch Actions Snapshot
     runs-on: ubuntu-latest
     env:
@@ -66,7 +69,9 @@ jobs:
   # Single job filter mode
   custom-report:
     name: Custom Job Report
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && inputs.job_filter
+    # --- END ENGRAM ---
     needs: fetch-actions-data
     runs-on: ubuntu-latest
     steps:
@@ -101,7 +106,9 @@ jobs:
   # Parse workflow files to get job names dynamically
   parse-workflows:
     name: Parse Workflow Jobs
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && !inputs.job_filter
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     outputs:
       pr_jobs: ${{ steps.parse.outputs.pr_jobs }}
@@ -151,7 +158,9 @@ jobs:
   pr-ci-reports:
     name: PR - ${{ matrix.job_name }}
     needs: [parse-workflows, fetch-actions-data]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && !inputs.job_filter
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -190,7 +199,9 @@ jobs:
   nightly-reports:
     name: Nightly - ${{ matrix.job_name }}
     needs: [parse-workflows, fetch-actions-data]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && !inputs.job_filter
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -229,7 +240,9 @@ jobs:
   pr-rocm720-ci-reports:
     name: PR ROCm720 - ${{ matrix.job_name }}
     needs: [parse-workflows, fetch-actions-data]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && !inputs.job_filter
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -268,7 +281,9 @@ jobs:
   nightly-rocm720-reports:
     name: Nightly ROCm720 - ${{ matrix.job_name }}
     needs: [parse-workflows, fetch-actions-data]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && !inputs.job_filter
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -306,7 +321,9 @@ jobs:
   # Runner fleet report - cross-workflow runner analytics in a single pass
   runner-fleet-report:
     name: Runner Fleet Report
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && !inputs.job_filter
+    # --- END ENGRAM ---
     needs: fetch-actions-data
     runs-on: ubuntu-latest
     steps:

@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: PR Test
 # Dynamic run-name for /rerun-stage commands to enable URL lookup
 # Format: "[stage-name] sha" for fork PRs, "[stage-name]" for non-fork, default for normal runs
@@ -75,7 +76,9 @@ permissions:
 jobs:
   # =============================================== check changes ====================================================
   check-changes:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     outputs:
       # Use API-based detection for target_stage mode (filter-api), otherwise use dorny/paths-filter (filter)
@@ -345,7 +348,9 @@ jobs:
     # Skip if call-gate failed (stage-a jobs will be skipped, nothing to wait for)
     # !cancelled() ensures this job respects workflow cancellation from concurrency group
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       !cancelled() &&
       github.event_name == 'pull_request' &&
@@ -373,7 +378,9 @@ jobs:
     # Only run for PRs (not scheduled) and when not targeting a specific stage
     # Skip if call-gate failed (stage-b jobs will be skipped, nothing to wait for)
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       !cancelled() &&
       github.event_name == 'pull_request' &&
@@ -408,7 +415,9 @@ jobs:
     needs: check-changes
     # Skip for scheduled runs (they run all tests) and when target_stage is specified
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       github.event_name != 'schedule' &&
       inputs.test_parallel_dispatch != true &&
       !inputs.target_stage &&
@@ -426,7 +435,9 @@ jobs:
   sgl-kernel-build-wheels:
     needs: [check-changes, call-gate]
     # Skip for scheduled runs (they run stages independently) and when target_stage is set
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && github.event_name != 'schedule' && inputs.test_parallel_dispatch != true && !inputs.target_stage && needs.check-changes.outputs.sgl_kernel == 'true'
+    # --- END ENGRAM ---
     runs-on: x64-kernel-build-node
     timeout-minutes: 240
     strategy:
@@ -477,7 +488,9 @@ jobs:
   sgl-kernel-build-wheels-arm:
     needs: [check-changes, call-gate]
     # Skip for scheduled runs (they run stages independently) and when target_stage is set
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && github.event_name != 'schedule' && inputs.test_parallel_dispatch != true && !inputs.target_stage && needs.check-changes.outputs.sgl_kernel == 'true'
+    # --- END ENGRAM ---
     runs-on: arm-kernel-build-node
     timeout-minutes: 240
     strategy:
@@ -529,7 +542,9 @@ jobs:
   call-sgl-kernel-tests:
     needs: [check-changes, call-gate, sgl-kernel-build-wheels]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       github.event_name != 'schedule' &&
       inputs.test_parallel_dispatch != true &&
       !inputs.target_stage &&
@@ -547,7 +562,9 @@ jobs:
 
   call-jit-kernel-tests:
     needs: [check-changes, call-gate]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.check-changes.outputs.jit_kernel == 'true'
+    # --- END ENGRAM ---
     uses: ./.github/workflows/pr-test-jit-kernel.yml
     with:
       jit_kernel: ${{ needs.check-changes.outputs.jit_kernel }}
@@ -564,7 +581,9 @@ jobs:
   stage-a-test-1-gpu-small:
     needs: [check-changes, call-gate, sgl-kernel-build-wheels]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-a-test-1-gpu-small') ||
@@ -613,7 +632,9 @@ jobs:
   stage-a-test-cpu:
     needs: [check-changes, call-gate]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-a-test-cpu') ||
@@ -668,7 +689,9 @@ jobs:
   stage-b-test-1-gpu-small:
     needs: [check-changes, call-gate, wait-for-stage-a, sgl-kernel-build-wheels]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-b-test-1-gpu-small') ||
@@ -727,7 +750,9 @@ jobs:
   stage-b-test-1-gpu-large:
     needs: [check-changes, call-gate, wait-for-stage-a, sgl-kernel-build-wheels]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-b-test-1-gpu-large') ||
@@ -783,7 +808,9 @@ jobs:
   stage-b-test-2-gpu-large:
     needs: [check-changes, call-gate, wait-for-stage-a, sgl-kernel-build-wheels]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-b-test-2-gpu-large') ||
@@ -839,7 +866,9 @@ jobs:
   stage-b-test-4-gpu-b200:
     needs: [check-changes, call-gate, wait-for-stage-a, sgl-kernel-build-wheels]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-b-test-4-gpu-b200') ||
@@ -896,7 +925,9 @@ jobs:
   call-multimodal-gen-tests:
     needs: [check-changes, call-gate, sgl-kernel-build-wheels]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       !cancelled() &&
       (
@@ -927,7 +958,9 @@ jobs:
   stage-c-test-4-gpu-h100:
     needs: [check-changes, call-gate, wait-for-stage-b]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-c-test-4-gpu-h100') ||
@@ -982,7 +1015,9 @@ jobs:
   stage-c-test-8-gpu-h200:
     needs: [check-changes, call-gate, wait-for-stage-b]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-c-test-8-gpu-h200') ||
@@ -1051,7 +1086,9 @@ jobs:
   stage-c-test-8-gpu-h20:
     needs: [check-changes, call-gate, wait-for-stage-b]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-c-test-8-gpu-h20') ||
@@ -1108,7 +1145,9 @@ jobs:
   stage-c-test-deepep-4-gpu-h100:
     needs: [check-changes, call-gate, wait-for-stage-b]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-c-test-deepep-4-gpu-h100') ||
@@ -1169,7 +1208,9 @@ jobs:
   stage-c-test-deepep-8-gpu-h200:
     needs: [check-changes, call-gate, wait-for-stage-b]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-c-test-deepep-8-gpu-h200') ||
@@ -1231,7 +1272,9 @@ jobs:
   stage-c-test-4-gpu-b200:
     needs: [check-changes, call-gate, wait-for-stage-b]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (inputs.target_stage == 'stage-c-test-4-gpu-b200') ||
@@ -1367,7 +1410,9 @@ jobs:
         stage-c-test-4-gpu-b200,
         # stage-c-test-4-gpu-gb200,  # Temporarily disabled — no GB200 runner
       ]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && always()
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     steps:
       - name: Check all dependent job statuses

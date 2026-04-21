@@ -1,3 +1,5 @@
+# ENGRAM_MODIFIED — Snapshot output processing hooks
+
 from __future__ import annotations
 
 import logging
@@ -371,6 +373,7 @@ class SchedulerOutputProcessorMixin:
             batch.reqs, batch.return_logprob, is_idle_batch=True
         )
 
+    # --- BEGIN ENGRAM: diffusion LLM batch result processing ---
     def process_batch_result_dllm(
         self: Scheduler,
         batch: ScheduleBatch,
@@ -409,6 +412,7 @@ class SchedulerOutputProcessorMixin:
                 prefill_stats=batch.prefill_stats,
                 can_run_cuda_graph=can_run_cuda_graph,
             )
+    # --- END ENGRAM ---
 
     def process_batch_result_decode(
         self: Scheduler,
@@ -581,6 +585,7 @@ class SchedulerOutputProcessorMixin:
                 req.multimodal_inputs.release_features()
             self.maybe_collect_routed_experts(req)
 
+            # --- BEGIN ENGRAM: snapshot finished-request state before cache release ---
             # Snapshot Mamba state BEFORE freeing the pool slot.
             # _trigger_snapshot_hooks (called later) fires after free_mamba_cache
             # has already set mamba_pool_idx = None, so it misses finished reqs.
@@ -605,6 +610,7 @@ class SchedulerOutputProcessorMixin:
                         turn_number=_turn_number,
                         additional_context=None,
                     )
+            # --- END ENGRAM ---
 
             if self.server_args.disaggregation_decode_enable_offload_kvcache:
                 # Asynchronously offload KV cache; release_kv_cache will be called after Device->Host transfer completes
@@ -1050,6 +1056,7 @@ class SchedulerOutputProcessorMixin:
             if req is skip_req:
                 continue
 
+            # --- BEGIN ENGRAM: restore_snapshot stateful-generate output routing ---
             # Stateful-generate requests (created by restore_snapshot with continuation_ids)
             # have no pending HTTP connection; route their final output via the snapshot
             # result channel and skip all normal BatchTokenIDOut output.
@@ -1086,6 +1093,7 @@ class SchedulerOutputProcessorMixin:
                         )
                     )
                 continue
+            # --- END ENGRAM ---
 
             # Multimodal partial stream chunks break the detokenizer, so drop aborted requests here.
             if self.model_config.is_multimodal_gen and req.to_finish:

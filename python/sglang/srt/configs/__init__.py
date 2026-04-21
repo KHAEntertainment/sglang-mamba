@@ -1,3 +1,5 @@
+# ENGRAM_MODIFIED — Mamba2Config import
+
 from sglang.srt.configs.afmoe import AfmoeConfig
 from sglang.srt.configs.bailing_hybrid import BailingHybridConfig
 from sglang.srt.configs.chatglm import ChatGLMConfig
@@ -19,7 +21,9 @@ from sglang.srt.configs.lfm2 import Lfm2Config
 from sglang.srt.configs.lfm2_moe import Lfm2MoeConfig
 from sglang.srt.configs.lfm2_vl import Lfm2VlConfig
 from sglang.srt.configs.longcat_flash import LongcatFlashConfig
+# --- BEGIN ENGRAM: Mamba2 config export ---
 from sglang.srt.configs.mamba2 import Mamba2Config
+# --- END ENGRAM ---
 from sglang.srt.configs.nano_nemotron_vl import NemotronH_Nano_VL_V2_Config
 from sglang.srt.configs.nemotron_h import NemotronHConfig
 from sglang.srt.configs.olmo3 import Olmo3Config
@@ -41,7 +45,9 @@ __all__ = [
     "DbrxConfig",
     "DeepseekVL2Config",
     "LongcatFlashConfig",
+    # --- BEGIN ENGRAM: Mamba2 config export ---
     "Mamba2Config",
+    # --- END ENGRAM ---
     "MultiModalityConfig",
     "KimiVLConfig",
     "MoonViTConfig",

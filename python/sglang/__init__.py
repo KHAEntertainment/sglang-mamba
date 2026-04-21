@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — Snapshot module import
 # SGLang public APIs
 
 # Install stubs early for platforms where certain dependencies are unavailable
@@ -70,8 +71,10 @@ VertexAI = LazyImport("sglang.lang.backend.vertexai", "VertexAI")
 ServerArgs = LazyImport("sglang.srt.server_args", "ServerArgs")
 Engine = LazyImport("sglang.srt.entrypoints.engine", "Engine")
 
+# --- BEGIN ENGRAM: expose SnapshotManager in the public API ---
 # Snapshot Management APIs
 SnapshotManager = LazyImport("sglang.snapshot", "SnapshotManager")
+# --- END ENGRAM ---
 
 __all__ = [
     "Engine",
@@ -105,7 +108,9 @@ __all__ = [
     "LiteLLM",
     "OpenAI",
     "VertexAI",
+    # --- BEGIN ENGRAM: export SnapshotManager in the public API ---
     "SnapshotManager",
+    # --- END ENGRAM ---
     "global_config",
     "__version__",
 ]

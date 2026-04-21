@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# ENGRAM_MODIFIED — Snapshot passthrough in chat
+
 import copy
 import json
 import logging
@@ -318,7 +320,9 @@ class OpenAIServingChat(OpenAIServingBase):
             return_hidden_states=request.return_hidden_states,
             return_routed_experts=request.return_routed_experts,
             rid=request.rid,
+            # --- BEGIN ENGRAM: chat conversation ID passthrough ---
             conversation_id=request.conversation_id,
+            # --- END ENGRAM ---
             extra_key=self._compute_extra_key(request),
             require_reasoning=self._get_reasoning_from_request(request),
             priority=request.priority,

@@ -13,6 +13,8 @@
 # ==============================================================================
 """Pydantic models for OpenAI API protocol"""
 
+# ENGRAM_MODIFIED — Snapshot fields in OpenAI-compatible API protocol
+
 import logging
 import time
 import uuid
@@ -308,8 +310,10 @@ class CompletionRequest(BaseModel):
 
     # For request id
     rid: Optional[Union[List[str], str]] = None
+    # --- BEGIN ENGRAM: conversation ID passthrough for completions ---
     # Conversation id for snapshot grouping across turns
     conversation_id: Optional[str] = None
+    # --- END ENGRAM ---
     # Extra key for classifying the request (e.g. cache_salt)
     extra_key: Optional[Union[List[str], str]] = None
     # Cache salt for request caching
@@ -629,8 +633,10 @@ class ChatCompletionRequest(BaseModel):
 
     # For request id
     rid: Optional[Union[List[str], str]] = None
+    # --- BEGIN ENGRAM: conversation ID passthrough for chat completions ---
     # Conversation id for snapshot grouping across turns
     conversation_id: Optional[str] = None
+    # --- END ENGRAM ---
     # Extra key for classifying the request (e.g. cache_salt)
     extra_key: Optional[Union[List[str], str]] = None
     # Cache salt for request caching

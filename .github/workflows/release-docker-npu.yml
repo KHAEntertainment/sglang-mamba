@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: Release Docker Images (NPU)
 on:
   push:
@@ -11,7 +12,9 @@ on:
 
 jobs:
   build:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: ubuntu-22.04-arm
     strategy:
       matrix:
@@ -43,7 +46,9 @@ jobs:
       # https://github.com/docker/login-action
       - name: Login to Docker Hub
         uses: docker/login-action@v2
+        # --- BEGIN ENGRAM: fork CI guard ---
         if: ${{ github.repository == 'sgl-project/sglang' && github.event_name != 'pull_request' }}
+        # --- END ENGRAM ---
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -85,7 +90,9 @@ jobs:
           platforms: linux/arm64,linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags || steps.version.outputs.TAG }}
+          # --- BEGIN ENGRAM: fork CI guard ---
           push: ${{ github.repository == 'sgl-project/sglang' && github.event_name != 'pull_request' }}
+          # --- END ENGRAM ---
           provenance: false
           build-args: |
             SGLANG_KERNEL_NPU_TAG=2026.03.10.rc1

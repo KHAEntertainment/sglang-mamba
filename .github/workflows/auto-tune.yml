@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: Auto tune
 
 on:
@@ -5,7 +6,9 @@ on:
 
 jobs:
   auto-tune-lint:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

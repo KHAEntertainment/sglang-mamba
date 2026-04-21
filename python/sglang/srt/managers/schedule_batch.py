@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+# ENGRAM_MODIFIED — Snapshot batch field
+
 from sglang.srt.dllm.config import DllmConfig
 from sglang.srt.model_executor.forward_batch_info import ForwardBatch
 from sglang.srt.utils.common import ceil_align, is_pin_memory_available
@@ -594,11 +596,15 @@ class Req(ReqDllmMixin):
         time_stats: Optional[
             Union[APIServerReqTimeStats, DPControllerReqTimeStats]
         ] = None,
+        # --- BEGIN ENGRAM: request conversation ID constructor field ---
         conversation_id: Optional[str] = None,
+        # --- END ENGRAM ---
     ):
         # Input and output info
         self.rid = rid
+        # --- BEGIN ENGRAM: request conversation ID storage ---
         self.conversation_id = conversation_id
+        # --- END ENGRAM ---
         self.origin_input_text = origin_input_text
         self.origin_input_ids_unpadded = (
             origin_input_ids_unpadded

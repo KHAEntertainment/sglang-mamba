@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: Runner Utilization Report
 
 on:
@@ -21,7 +22,9 @@ on:
 
 jobs:
   report:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     name: Generate Report
     runs-on: ubuntu-latest
     steps:

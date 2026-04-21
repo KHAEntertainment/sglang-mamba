@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: PR Test (NPU)
 
 on:
@@ -26,7 +27,9 @@ concurrency:
 jobs:
   # ==================== Check Changes ==================== #
   check-changes:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     outputs:
       changes_exist: ${{ steps.filter.outputs.main_package == 'true' || steps.filter.outputs.multimodal_gen == 'true' || steps.run-mode.outputs.run_all_tests == 'true'}}
@@ -73,13 +76,17 @@ jobs:
   # ==================== PR Gate ==================== #
   pr-gate:
     needs: check-changes
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.check-changes.outputs.changes_exist == 'true'
+    # --- END ENGRAM ---
     uses: ./.github/workflows/pr-gate.yml
     secrets: inherit
 
   stage-b-test-1-npu-a2:
     needs: [check-changes, pr-gate]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.check-changes.outputs.main_package == 'true'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a2-1
     strategy:
       fail-fast: false
@@ -130,7 +137,9 @@ jobs:
 
   stage-b-test-2-npu-a2:
     needs: [check-changes, pr-gate]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.check-changes.outputs.main_package == 'true'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a2-2
     strategy:
       fail-fast: true
@@ -181,7 +190,9 @@ jobs:
 
   stage-b-test-4-npu-a3:
     needs: [check-changes, pr-gate]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.check-changes.outputs.main_package == 'true'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a3-4
     container:
       image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/cann:8.5.0-a3-ubuntu22.04-py3.11
@@ -229,7 +240,9 @@ jobs:
 
   stage-b-test-16-npu-a3:
     needs: [check-changes, pr-gate]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.check-changes.outputs.main_package == 'true'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a3-16
     container:
       image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/cann:8.5.0-a3-ubuntu22.04-py3.11
@@ -276,7 +289,9 @@ jobs:
 
   multimodal-gen-test-1-npu-a3:
     needs: [check-changes, pr-gate]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.check-changes.outputs.multimodal_gen == 'true'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a3-2
     container:
       image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/cann:8.3.rc2-a3-ubuntu22.04-py3.11
@@ -322,7 +337,9 @@ jobs:
 
   multimodal-gen-test-2-npu-a3:
     needs: [check-changes, pr-gate]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.check-changes.outputs.multimodal_gen == 'true'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a3-16
     container:
       image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/cann:8.3.rc2-a3-ubuntu22.04-py3.11
@@ -368,7 +385,9 @@ jobs:
 
   multimodal-gen-test-8-npu-a3:
     needs: [check-changes, pr-gate]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.check-changes.outputs.multimodal_gen == 'true'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a3-8
     container:
       image: swr.cn-southwest-2.myhuaweicloud.com/base_image/ascend-ci/cann:8.5.0-a3-ubuntu22.04-py3.11
@@ -425,7 +444,9 @@ jobs:
         multimodal-gen-test-2-npu-a3,
         multimodal-gen-test-8-npu-a3,
       ]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && always()
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     steps:
       - name: Check all dependent job statuses

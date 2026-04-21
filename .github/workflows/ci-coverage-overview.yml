@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: CI Coverage Overview
 
 on:
@@ -21,7 +22,9 @@ on:
 
 jobs:
   summary:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     name: Summary
     runs-on: ubuntu-latest
     steps:
@@ -38,7 +41,9 @@ jobs:
           python scripts/ci/utils/ci_coverage_report.py --section summary
 
   by-folder:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     name: Tests by Folder
     runs-on: ubuntu-latest
     steps:
@@ -55,7 +60,9 @@ jobs:
           python scripts/ci/utils/ci_coverage_report.py --section by-folder
 
   by-suite:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     name: Tests by Suite
     runs-on: ubuntu-latest
     steps:
@@ -73,7 +80,9 @@ jobs:
 
   unit-test-coverage:
     name: Unit Test Code Coverage
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && github.event_name != 'pull_request'
+    # --- END ENGRAM ---
     runs-on: 1-gpu-h100
     timeout-minutes: 30
     steps:
@@ -141,7 +150,9 @@ jobs:
   json-export:
     name: JSON Export
     runs-on: ubuntu-latest
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && inputs.output_format == 'json'
+    # --- END ENGRAM ---
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

@@ -1,5 +1,6 @@
 """The interpreter that executes SGL programs"""
 
+# ENGRAM_MODIFIED — Snapshot interpreter support
 import asyncio
 import contextvars
 import copy
@@ -1020,6 +1021,7 @@ class ProgramState:
     def get_meta_info(self, name):
         return self.stream_executor.get_meta_info(name)
 
+    # --- BEGIN ENGRAM: snapshot helpers on ProgramState ---
     def save_snapshot(
         self,
         snapshot_id: Optional[str] = None,
@@ -1195,6 +1197,7 @@ class ProgramState:
         )
 
         return result.get("success", False)
+    # --- END ENGRAM ---
 
     def __iadd__(self, other):
         if other is None:

@@ -1,3 +1,4 @@
+<!-- ENGRAM_MODIFIED — Fork model compatibility matrix and validation results -->
 # Engram — Model Compatibility Matrix
 
 This document tracks all models validated against the Engram snapshot infrastructure. Each row represents a completed run of the [Model Compatibility Protocol](MODEL_COMPAT_PROTOCOL.md).

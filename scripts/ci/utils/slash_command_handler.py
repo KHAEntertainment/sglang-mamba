@@ -1,9 +1,11 @@
+# ENGRAM_MODIFIED — CI handler fork tweak
 import glob
 import json
 import os
 import re
 import sys
 import time
+# ENGRAM_CHANGED: Engram's slash-command handler does not use timezone-aware timestamps here.
 from datetime import datetime
 
 import requests

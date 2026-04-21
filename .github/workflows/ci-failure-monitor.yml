@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: CI Failure Monitor
 
 on:
@@ -15,7 +16,9 @@ permissions:
 
 jobs:
   failure-analysis:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

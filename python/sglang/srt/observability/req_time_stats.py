@@ -13,6 +13,8 @@
 # ==============================================================================
 """Utilities for Request Time Stats."""
 
+# ENGRAM_MODIFIED — Snapshot timing statistics
+
 from __future__ import annotations
 
 import logging
@@ -190,6 +192,7 @@ class RequestStage:
         metrics_is_observed=True,
     )
 
+    # --- BEGIN ENGRAM: additional request stages for snapshot-related scheduling ---
     # mini lb
     MINI_LB_LAUNCH = RequestStageConfig(
         "mini_lb_launch",
@@ -200,6 +203,7 @@ class RequestStage:
         "wait_pd_finish",
         level=2,
     )
+    # --- END ENGRAM ---
 
     # other
     ANONYMOUS = RequestStageConfig("")

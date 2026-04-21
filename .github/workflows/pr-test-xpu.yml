@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: PR Test (XPU)
 
 on:
@@ -26,7 +27,9 @@ concurrency:
 jobs:
   # ==================== Check Changes ==================== #
   check-changes:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     outputs:
       main_package: ${{ steps.filter.outputs.main_package || steps.run-mode.outputs.run_all_tests }}
@@ -65,13 +68,17 @@ jobs:
   # ==================== PR Gate ==================== #
   pr-gate:
     needs: check-changes
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.check-changes.outputs.main_package == 'true'
+    # --- END ENGRAM ---
     uses: ./.github/workflows/pr-gate.yml
     secrets: inherit
 
   build-and-test:
     needs: [check-changes, pr-gate]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && needs.check-changes.outputs.main_package == 'true'
+    # --- END ENGRAM ---
     runs-on: intel-bmg
     env:
       HF_HOME: /home/sdp/.cache/huggingface
@@ -129,7 +136,9 @@ jobs:
           docker rm -f "$cid" || true
 
   finish:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && always()
+    # --- END ENGRAM ---
     needs: [build-and-test, pr-gate]
     runs-on: ubuntu-latest
     steps:

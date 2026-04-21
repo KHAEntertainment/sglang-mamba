@@ -1,3 +1,4 @@
+<!-- ENGRAM_MODIFIED — Snapshot trace documentation -->
 # Production Request Tracing
 
 SGLang exports request trace data based on the OpenTelemetry Collector. You can enable tracing by adding the `--enable-trace` and configure the OpenTelemetry Collector endpoint using `--otlp-traces-endpoint` when launching the server.

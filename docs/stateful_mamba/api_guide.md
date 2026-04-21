@@ -1,3 +1,4 @@
+<!-- ENGRAM_MODIFIED — Engram HTTP API guide -->
 # Engram API Guide
 
 User-friendly guide to Engram's snapshot and statefulness API.

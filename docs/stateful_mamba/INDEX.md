@@ -1,3 +1,4 @@
+<!-- ENGRAM_MODIFIED — Stateful Mamba documentation index -->
 # Engram Docs Index
 
 Index for the snapshot and statefulness documentation in this repository.

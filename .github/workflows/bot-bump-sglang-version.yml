@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: Bot Bump SGLang Version
 
 on:
@@ -14,7 +15,9 @@ permissions:
 
 jobs:
   bump-sglang-version:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     outputs:
       branch_name: ${{ steps.set_output.outputs.branch_name }}
@@ -55,7 +58,9 @@ jobs:
           bash scripts/release/commit_and_pr.sh "SGLang" "${{ github.event.inputs.new_version }}" "$BRANCH_NAME"
 
   run-nightly-tests-nvidia:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: bump-sglang-version
     uses: ./.github/workflows/nightly-test-nvidia.yml
     with:
@@ -63,7 +68,9 @@ jobs:
     secrets: inherit
 
   run-nightly-tests-amd:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: bump-sglang-version
     uses: ./.github/workflows/nightly-test-amd.yml
     with:
@@ -71,7 +78,9 @@ jobs:
     secrets: inherit
 
   run-nightly-tests-npu:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: bump-sglang-version
     uses: ./.github/workflows/nightly-test-npu.yml
     with:
@@ -79,7 +88,9 @@ jobs:
     secrets: inherit
 
   run-pr-tests-xeon:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: bump-sglang-version
     uses: ./.github/workflows/pr-test-xeon.yml
     with:
@@ -87,7 +98,9 @@ jobs:
     secrets: inherit
 
   run-pr-tests-xpu:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: bump-sglang-version
     uses: ./.github/workflows/pr-test-xpu.yml
     with:

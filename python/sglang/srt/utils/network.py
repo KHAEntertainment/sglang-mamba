@@ -1,3 +1,5 @@
+# ENGRAM_MODIFIED — Network utilities for snapshot system
+
 from __future__ import annotations
 
 import ipaddress
@@ -388,6 +390,7 @@ def get_zmq_socket(
         return socket
 
 
+# --- BEGIN ENGRAM: IPv6 address parsing helper ---
 def configure_ipv6(dist_init_addr):
     """Parse an IPv6 dist_init_addr of the form [ipv6]:port into (port, host)."""
     addr = dist_init_addr
@@ -417,6 +420,7 @@ def configure_ipv6(dist_init_addr):
     except ValueError:
         raise ValueError(f"invalid port in IPv6 address: '{port_str}'")
     return port, host
+# --- END ENGRAM ---
 
 
 def _is_ipv6(host: str) -> bool:
@@ -549,6 +553,7 @@ class NetworkAddress:
             )
         return NetworkAddress(host, _parse_port(port_str))
 
+    # --- BEGIN ENGRAM: NetworkAddress construction from host and port parts ---
     @staticmethod
     def from_parts(host: str, port: int) -> NetworkAddress:
         """Create from separate host and port, stripping brackets if present.
@@ -559,6 +564,7 @@ class NetworkAddress:
         if host.startswith("[") and host.endswith("]"):
             host = host[1:-1]
         return NetworkAddress(host, port)
+    # --- END ENGRAM ---
 
     def __str__(self) -> str:
         return self.to_host_port_str()

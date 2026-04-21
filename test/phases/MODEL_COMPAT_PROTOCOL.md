@@ -1,3 +1,4 @@
+<!-- ENGRAM_MODIFIED — Fork model testing protocol -->
 # Model Compatibility Protocol — Standardized Agent Instructions
 
 ## Purpose

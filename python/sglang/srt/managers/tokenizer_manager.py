@@ -13,6 +13,8 @@
 # ==============================================================================
 """TokenizerManager is a process that tokenizes the text."""
 
+# ENGRAM_MODIFIED — Snapshot and agent token management
+
 import asyncio
 import copy
 import dataclasses
@@ -55,23 +57,31 @@ from sglang.srt.managers.io_struct import (
     BatchTokenizedGenerateReqInput,
     ConfigureLoggingReq,
     ContinueGenerationReqInput,
+    # --- BEGIN ENGRAM: snapshot request routing types ---
     DeleteSnapshotReqInput,
     DeleteSnapshotReqOutput,
+    # --- END ENGRAM ---
     EmbeddingReqInput,
     FreezeGCReq,
     GenerateReqInput,
+    # --- BEGIN ENGRAM: snapshot request routing types ---
     GetSnapshotInfoReqInput,
     GetSnapshotInfoReqOutput,
+    # --- END ENGRAM ---
     HealthCheckOutput,
+    # --- BEGIN ENGRAM: snapshot request routing types ---
     ListSnapshotsReqInput,
     ListSnapshotsReqOutput,
+    # --- END ENGRAM ---
     LoadLoRAAdapterReqInput,
     OpenSessionReqOutput,
     PauseGenerationReqInput,
+    # --- BEGIN ENGRAM: snapshot request routing types ---
     RestoreSnapshotReqInput,
     RestoreSnapshotReqOutput,
     SaveSnapshotReqInput,
     SaveSnapshotReqOutput,
+    # --- END ENGRAM ---
     SessionParams,
     TokenizedEmbeddingReqInput,
     TokenizedGenerateReqInput,
@@ -379,19 +389,23 @@ class TokenizerManager(TokenizerCommunicatorMixin, TokenizerManagerScoreMixin):
         self.gracefully_exit = False
         self.last_receive_tstamp = real_time()
 
+        # --- BEGIN ENGRAM: tokenizer-side load balancing state ---
         # For load balancing
         self.current_load = 0
         self.current_load_lock = asyncio.Lock()
+        # --- END ENGRAM ---
 
         # Session
         self.session_futures = {}  # session_id -> asyncio event
 
+        # --- BEGIN ENGRAM: snapshot response queues ---
         # Snapshot response queues (used by dispatcher to route snapshot results back to callers)
         self.snapshot_save_result_queue: asyncio.Queue = asyncio.Queue()
         self.snapshot_restore_result_queue: asyncio.Queue = asyncio.Queue()
         self.snapshot_list_result_queue: asyncio.Queue = asyncio.Queue()
         self.snapshot_info_result_queue: asyncio.Queue = asyncio.Queue()
         self.snapshot_delete_result_queue: asyncio.Queue = asyncio.Queue()
+        # --- END ENGRAM ---
 
     def init_request_logging_and_dumping(self):
         # TODO: Refactor and organize the log export code.
@@ -520,6 +534,7 @@ class TokenizerManager(TokenizerCommunicatorMixin, TokenizerManagerScoreMixin):
                 # For handling case when scheduler skips detokenizer and forwards back to the tokenizer manager, we ignore it.
                 (HealthCheckOutput, lambda x: None),
                 (ActiveRanksOutput, self.update_active_ranks),
+                # --- BEGIN ENGRAM: snapshot response dispatch ---
                 # Snapshot response routing: enqueue to per-operation queues for callers to await
                 (
                     SaveSnapshotReqOutput,
@@ -541,6 +556,7 @@ class TokenizerManager(TokenizerCommunicatorMixin, TokenizerManagerScoreMixin):
                     DeleteSnapshotReqOutput,
                     lambda x: self.snapshot_delete_result_queue.put_nowait(x),
                 ),
+                # --- END ENGRAM ---
             ]
         )
         self.init_communicators(self.server_args)
@@ -1055,7 +1071,9 @@ class TokenizerManager(TokenizerCommunicatorMixin, TokenizerManagerScoreMixin):
                 token_type_ids=token_type_ids,
                 need_wait_for_mm_inputs=obj.need_wait_for_mm_inputs,
                 num_items_assigned=obj.num_items_assigned,
+                # --- BEGIN ENGRAM: propagate conversation IDs into tokenized requests ---
                 conversation_id=obj.conversation_id,
+                # --- END ENGRAM ---
             )
         elif isinstance(obj, EmbeddingReqInput):
             tokenized_obj = TokenizedEmbeddingReqInput(
@@ -1475,6 +1493,7 @@ class TokenizerManager(TokenizerCommunicatorMixin, TokenizerManagerScoreMixin):
             await self.send_to_scheduler.send_pyobj(obj)
             self.is_pause_cond.notify_all()
 
+    # --- BEGIN ENGRAM: snapshot request forwarding helpers ---
     async def save_snapshot(self, obj: "SaveSnapshotReqInput"):
         """Forward snapshot save request to scheduler."""
         await self.send_to_scheduler.send_pyobj(obj)
@@ -1509,6 +1528,7 @@ class TokenizerManager(TokenizerCommunicatorMixin, TokenizerManagerScoreMixin):
         await self.send_to_scheduler.send_pyobj(obj)
         recv_obj = await self.snapshot_delete_result_queue.get()
         return recv_obj
+    # --- END ENGRAM ---
 
     async def update_weights_from_disk(
         self,

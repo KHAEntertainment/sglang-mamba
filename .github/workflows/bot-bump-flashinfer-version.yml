@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: Bot Bump Flashinfer Version
 
 on:
@@ -14,7 +15,9 @@ permissions:
 
 jobs:
   bump-flashinfer-version:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code

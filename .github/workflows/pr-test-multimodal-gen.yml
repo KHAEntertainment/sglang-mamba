@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: PR Test - Multimodal Gen
 
 on:
@@ -52,7 +53,9 @@ env:
 jobs:
   multimodal-gen-test-1-gpu:
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       (github.repository == 'sgl-project/sglang') &&
+      # --- END ENGRAM ---
       ((inputs.target_stage == 'multimodal-gen-test-1-gpu') ||
       (
         !inputs.target_stage &&
@@ -107,7 +110,9 @@ jobs:
 
   multimodal-gen-test-2-gpu:
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       (github.repository == 'sgl-project/sglang') &&
+      # --- END ENGRAM ---
       ((inputs.target_stage == 'multimodal-gen-test-2-gpu') ||
       (
         !inputs.target_stage &&
@@ -209,7 +214,9 @@ jobs:
 
   multimodal-gen-unit-test:
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       (github.repository == 'sgl-project/sglang') &&
+      # --- END ENGRAM ---
       ((inputs.target_stage == 'multimodal-gen-unit-test') ||
       (
         !inputs.target_stage &&

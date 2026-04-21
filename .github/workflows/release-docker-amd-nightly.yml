@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: Release Docker Images Nightly (AMD)
 on:
   workflow_dispatch:
@@ -14,7 +15,9 @@ concurrency:
 
 jobs:
   publish:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: amd-docker-scale
     environment: 'prod'
     strategy:
@@ -95,8 +98,12 @@ jobs:
 
   # Temporarily disable docker cache seeding until performant storage is in place
   cache:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && false
+    # --- END ENGRAM ---
+    # --- BEGIN ENGRAM: fork CI guard ---
     # if: always() && github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: linux-mi300-gpu-1
     environment: 'prod'
     needs: publish

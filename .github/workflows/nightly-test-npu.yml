@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: Nightly Test (NPU)
 
 on:
@@ -39,7 +40,9 @@ concurrency:
 
 jobs:
   set-image-config:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     outputs:
       ref: ${{ steps.set-vars.outputs.ref }}
@@ -77,7 +80,9 @@ jobs:
 
   nightly-1-npu-a3:
     needs: [set-image-config]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a3-2
     strategy:
       fail-fast: false
@@ -143,7 +148,9 @@ jobs:
 
   nightly-2-npu-a3:
     needs: [set-image-config]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a3-2
     strategy:
       fail-fast: false
@@ -208,7 +215,9 @@ jobs:
 
   nightly-4-npu-a3:
     needs: [set-image-config]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a3-4
     strategy:
       fail-fast: false
@@ -274,7 +283,9 @@ jobs:
 
   nightly-8-npu-a3:
     needs: [set-image-config]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a3-8
     strategy:
       fail-fast: false
@@ -340,7 +351,9 @@ jobs:
 
   nightly-16-npu-a3:
     needs: [set-image-config]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: linux-aarch64-a3-16
     strategy:
       fail-fast: false
@@ -405,7 +418,9 @@ jobs:
           python3 run_suite.py --hw npu --suite nightly-16-npu-a3 --nightly --continue-on-error --timeout-per-file 3600 --auto-partition-id ${{ matrix.part }} --auto-partition-size 2
 
   check-all-jobs:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && always()
+    # --- END ENGRAM ---
     needs:
       - nightly-1-npu-a3
       - nightly-2-npu-a3

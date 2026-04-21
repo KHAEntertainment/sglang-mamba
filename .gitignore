@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — Fork-specific ignore patterns
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -192,9 +193,11 @@ work_dirs/
 *.csv
 
 !logo.png
+# --- BEGIN ENGRAM: keep Engram branding assets tracked ---
 !assets/engram-logo-banner.png
 !assets/engram-logo-square.png
 !assets/archive/logo_square.png
+# --- END ENGRAM ---
 
 # Prerequisites
 *.d
@@ -234,7 +237,9 @@ work_dirs/
 .vscode
 
 # Autoenv
+# --- BEGIN ENGRAM: ignore direnv configuration in the fork ---
 .envrc
+# --- END ENGRAM ---
 .env.leave
 
 # Rust lib
@@ -278,6 +283,7 @@ sgl-kernel/csrc/**/*_musa/
 *.ply
 *.npz
 
+# --- BEGIN ENGRAM: ignore local Engram development artifacts ---
 # Dev tool artifacts (not part of Engram)
 .dolt/
 .beads/
@@ -302,3 +308,4 @@ test/phases/results/*.json
 
 # Vercel AI SDK provider (will move to own repo)
 vercel_sdk_provider/
+# --- END ENGRAM ---

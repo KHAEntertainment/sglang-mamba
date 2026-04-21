@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — Fork pre-commit configuration
 default_stages: [pre-commit, pre-push, manual]
 exclude: ^(python/sglang/multimodal_gen/csrc|python/sglang/jit_kernel/flash_attention/cute)
 
@@ -67,12 +68,14 @@ repos:
           - '--extra-keys=metadata.kernelspec metadata.language_info.version'
   - repo: local
     hooks:
+      # --- BEGIN ENGRAM: guard protected-path edits locally ---
       - id: engram-protected-path-guard
         name: engram protected path guard
         entry: python3 scripts/policy/check_protected_paths.py check-local-edits
         language: system
         pass_filenames: true
         stages: [pre-commit, pre-push]
+      # --- END ENGRAM ---
       - id: check-chinese-characters
         name: check chinese characters in multimodal_gen
         entry: >-
@@ -87,6 +90,7 @@ repos:
         language: system
         files: ^\.github/CI_PERMISSIONS\.json$
         pass_filenames: false
+      # --- BEGIN ENGRAM: validate Engram policy and funding metadata ---
       - id: validate-engram-protected-path-policy
         name: validate engram protected path policy
         entry: python3 scripts/policy/check_protected_paths.py validate-policy
@@ -99,6 +103,7 @@ repos:
         language: python
         additional_dependencies: [jsonschema==4.25.1]
         files: ^funding\.json$
+      # --- END ENGRAM ---
       - id: check-workflow-job-names
         name: check for duplicate workflow job names
         entry: python3 scripts/ci/check_workflow_job_names.py

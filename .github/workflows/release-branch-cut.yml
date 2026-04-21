@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: Release Branch Cut
 
 on:
@@ -21,7 +22,9 @@ permissions:
 
 jobs:
   cut-release-branch:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     environment: 'prod'
     outputs:
@@ -146,7 +149,9 @@ jobs:
           echo "3. Create a tag to trigger release: \`gh workflow run release-tag.yml -f version=X.Y.Z -f ref=$BRANCH_NAME\`" >> $GITHUB_STEP_SUMMARY
 
   run-pr-tests-nvidia:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: cut-release-branch
     uses: ./.github/workflows/pr-test.yml
     with:
@@ -156,7 +161,9 @@ jobs:
     secrets: inherit
 
   run-pr-tests-amd:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: cut-release-branch
     uses: ./.github/workflows/pr-test-amd.yml
     with:
@@ -165,7 +172,9 @@ jobs:
     secrets: inherit
 
   run-pr-test-npu:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: cut-release-branch
     uses: ./.github/workflows/pr-test-npu.yml
     with:
@@ -174,7 +183,9 @@ jobs:
     secrets: inherit
 
   run-pr-tests-xeon:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: cut-release-branch
     uses: ./.github/workflows/pr-test-xeon.yml
     with:
@@ -183,7 +194,9 @@ jobs:
     secrets: inherit
 
   run-pr-tests-xpu:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: cut-release-branch
     uses: ./.github/workflows/pr-test-xpu.yml
     with:
@@ -192,7 +205,9 @@ jobs:
     secrets: inherit
 
   run-nightly-tests-nvidia:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: cut-release-branch
     uses: ./.github/workflows/nightly-test-nvidia.yml
     with:
@@ -200,7 +215,9 @@ jobs:
     secrets: inherit
 
   run-nightly-tests-amd:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: cut-release-branch
     uses: ./.github/workflows/nightly-test-amd.yml
     with:
@@ -208,7 +225,9 @@ jobs:
     secrets: inherit
 
   run-nightly-tests-npu:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: cut-release-branch
     uses: ./.github/workflows/nightly-test-npu.yml
     with:
@@ -216,7 +235,9 @@ jobs:
     secrets: inherit
 
   run-nightly-tests-intel:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: cut-release-branch
     uses: ./.github/workflows/nightly-test-intel.yml
     with:

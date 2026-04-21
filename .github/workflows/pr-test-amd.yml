@@ -1,3 +1,4 @@
+# ENGRAM_MODIFIED — CI guard: job disabled on fork (upstream-only)
 name: PR Test (AMD)
 # Dynamic run-name for /rerun-stage commands to enable URL lookup
 # Format: "[stage-name] sha" for fork PRs, "[stage-name]" for non-fork, default for normal runs
@@ -101,11 +102,15 @@ concurrency:
 
 jobs:
   call-gate:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     uses: ./.github/workflows/pr-gate.yml
     secrets: inherit
   check-changes:
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang'
+    # --- END ENGRAM ---
     needs: [call-gate]
     runs-on: ubuntu-latest
     outputs:
@@ -165,7 +170,9 @@ jobs:
   sgl-kernel-unit-test-amd:
     needs: [check-changes]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',sgl-kernel-unit-test-amd,')) ||
@@ -213,7 +220,9 @@ jobs:
   sgl-kernel-unit-test-2-gpu-amd:
     needs: [check-changes]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',sgl-kernel-unit-test-2-gpu-amd,')) ||
@@ -256,7 +265,9 @@ jobs:
   stage-a-test-1-gpu-small-amd:
     needs: [check-changes]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',stage-a-test-1-gpu-small-amd,')) ||
@@ -297,7 +308,9 @@ jobs:
   jit-kernel-unit-test-amd:
     needs: [check-changes]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',jit-kernel-unit-test-amd,')) ||
@@ -337,7 +350,9 @@ jobs:
   stage-b-test-1-gpu-small-amd:
     needs: [check-changes, stage-a-test-1-gpu-small-amd]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',stage-b-test-1-gpu-small-amd,')) ||
@@ -378,7 +393,9 @@ jobs:
   stage-b-test-1-gpu-small-amd-nondeterministic:
     needs: [check-changes, stage-a-test-1-gpu-small-amd]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',stage-b-test-1-gpu-small-amd-nondeterministic,')) ||
@@ -418,7 +435,9 @@ jobs:
   stage-b-test-1-gpu-small-amd-mi35x:
     needs: [check-changes, stage-a-test-1-gpu-small-amd]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',stage-b-test-1-gpu-small-amd-mi35x,')) ||
@@ -458,7 +477,9 @@ jobs:
   stage-b-test-1-gpu-large-amd:
     needs: [check-changes, stage-a-test-1-gpu-small-amd]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',stage-b-test-1-gpu-large-amd,')) ||
@@ -499,7 +520,9 @@ jobs:
   stage-b-test-2-gpu-large-amd:
     needs: [check-changes, stage-a-test-1-gpu-small-amd]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',stage-b-test-2-gpu-large-amd,')) ||
@@ -540,7 +563,9 @@ jobs:
   multimodal-gen-test-1-gpu-amd:
     needs: [check-changes]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',multimodal-gen-test-1-gpu-amd,')) ||
@@ -670,7 +695,9 @@ jobs:
   multimodal-gen-test-2-gpu-amd:
     needs: [check-changes]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',multimodal-gen-test-2-gpu-amd,')) ||
@@ -799,7 +826,9 @@ jobs:
   stage-c-test-4-gpu-amd:
     needs: [check-changes, call-gate, stage-b-test-1-gpu-small-amd, stage-b-test-2-gpu-large-amd]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',stage-c-test-4-gpu-amd,')) ||
@@ -856,7 +885,9 @@ jobs:
   stage-c-test-large-8-gpu-amd:
     needs: [check-changes, call-gate, stage-b-test-1-gpu-small-amd, stage-b-test-2-gpu-large-amd]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',stage-c-test-large-8-gpu-amd,')) ||
@@ -905,7 +936,9 @@ jobs:
   stage-c-test-large-8-gpu-amd-mi35x:
     needs: [check-changes, call-gate, stage-b-test-1-gpu-small-amd, stage-b-test-2-gpu-large-amd]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',stage-c-test-large-8-gpu-amd-mi35x,')) ||
@@ -947,7 +980,9 @@ jobs:
   stage-b-test-large-8-gpu-35x-disaggregation-amd:
     needs: [check-changes, stage-a-test-1-gpu-small-amd]
     if: |
+      # --- BEGIN ENGRAM: fork CI guard ---
       github.repository == 'sgl-project/sglang' &&
+      # --- END ENGRAM ---
       always() &&
       (
         (contains(format(',{0},', inputs.target_stage || inputs.target_stage_select), ',stage-b-test-large-8-gpu-disaggregation-amd,')) ||
@@ -1079,7 +1114,9 @@ jobs:
         stage-c-test-large-8-gpu-amd,
         stage-c-test-large-8-gpu-amd-mi35x,
       ]
+    # --- BEGIN ENGRAM: fork CI guard ---
     if: github.repository == 'sgl-project/sglang' && always()
+    # --- END ENGRAM ---
     runs-on: ubuntu-latest
     steps:
       - name: Check all dependent job statuses
