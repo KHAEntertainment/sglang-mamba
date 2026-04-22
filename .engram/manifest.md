@@ -20,8 +20,8 @@
 | Added files (A) | 176 |
 | Deleted files (D) | 7 |
 | Renamed files (R) | 4 |
-| Total ENGRAM_MODIFIED headers | 71 |
-| Total BEGIN/END ENGRAM blocks | 68 |
+| Total ENGRAM_MODIFIED headers | 85 |
+| Total BEGIN/END ENGRAM blocks | 322 |
 
 ## High Conflict Risk — Modified Upstream Files with 5+ Blocks ⚠️
 
