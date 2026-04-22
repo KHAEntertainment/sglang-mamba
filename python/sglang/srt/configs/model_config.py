@@ -11,6 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+# ENGRAM_MODIFIED — Mamba config adaptations (safe architecture access, multimodal guards)
 
 import json
 import logging
@@ -65,7 +66,7 @@ def is_deepseek_nsa(config) -> bool:
     )
     return (
         architectures is not None
-        and len(architectures) > 0
+        and len(architectures) > 0  # ENGRAM_CHANGED: Engram guards against empty architectures list for pure SSM models
         and architectures[0]
         in [
             "DeepseekV3ForCausalLM",
@@ -159,8 +160,8 @@ class ModelConfig:
                 "Llama4ForConditionalGeneration",
                 "Step3VLForConditionalGeneration",
             ]
+            # ENGRAM_CHANGED: Engram guards pure SSM models (e.g. Mamba2) that have no architecture string
             if not self.hf_config.architectures:
-                # Pure SSM models (e.g. Mamba2) have no architecture string
                 enable_multimodal = False
             elif (
                 self.hf_config.architectures[0] in mm_disabled_models
@@ -193,6 +194,7 @@ class ModelConfig:
             is_multimodal_model(self.hf_config.architectures)
             or has_multimodal_subconfig
         )
+        # ENGRAM_CHANGED: Engram marks non-generative multimodal models explicitly
         # True only for models that generate multimodal content (e.g. images).
         # Text-only and vision-understanding models are False.
         self.is_multimodal_gen = False
@@ -308,6 +310,7 @@ class ModelConfig:
 
     def _config_draft_model(self):
         is_draft_model = self.is_draft_model
+        # ENGRAM_CHANGED: Engram skips draft model config for pure SSM models without architectures
         if not self.hf_config.architectures:
             return  # Pure SSM models have no draft model variants
 
@@ -390,6 +393,7 @@ class ModelConfig:
                 )
             )
 
+        # --- BEGIN ENGRAM: guard is_hybrid_swa_compress for pure SSM models ---
         self.is_hybrid_swa_compress = (
             self.hf_config.architectures
             and self.hf_config.architectures[0]
@@ -400,6 +404,7 @@ class ModelConfig:
                 "Gemma4ForConditionalGeneration",
             ]
         )
+        # --- END ENGRAM ---
 
     def _derive_context_length(self, context_length: int):
         is_draft_model = self.is_draft_model
@@ -437,6 +442,7 @@ class ModelConfig:
 
     def _derive_model_shapes(self):
         # Unify the config keys for hf_text_config
+        # --- BEGIN ENGRAM: guard head_dim for models without num_attention_heads ---
         self.head_dim = getattr(
             self.hf_text_config,
             "head_dim",
@@ -447,6 +453,7 @@ class ModelConfig:
                 else None
             ),
         )
+        # --- END ENGRAM ---
         self.v_head_dim = getattr(
             self.hf_text_config,
             "v_head_dim",
@@ -589,6 +596,7 @@ class ModelConfig:
 
             self.attention_arch = AttentionArch.MHA
 
+        # ENGRAM_CHANGED: Engram uses getattr with default 0 for pure SSM models without attention heads
         self.num_attention_heads = getattr(
             self.hf_text_config, "num_attention_heads", 0
         )

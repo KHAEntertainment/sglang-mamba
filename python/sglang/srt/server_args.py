@@ -11,6 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+# ENGRAM_MODIFIED — Snapshot/Mamba CLI args, memory tiers, agent tools, SSL validation, IPv6 URL
 """The arguments of the server."""
 
 from __future__ import annotations
@@ -67,7 +68,7 @@ from sglang.srt.utils.common import (
     xpu_has_xmx_support,
 )
 from sglang.srt.utils.hf_transformers_utils import check_gguf_file
-from sglang.srt.utils.network import (
+from sglang.srt.utils.network import (  # ENGRAM_CHANGED: Engram adds is_valid_ipv6_address for IPv6 URL support
     NetworkAddress,
     get_free_port,
     is_valid_ipv6_address,
@@ -562,6 +563,7 @@ class ServerArgs:
     linear_attn_decode_backend: Optional[str] = None
     linear_attn_prefill_backend: Optional[str] = None
 
+    # --- BEGIN ENGRAM: Mamba state persistence, memory tiers, agent tools ---
     # Mamba state persistence (snapshot system)
     enable_snapshot_persistence: bool = False
     snapshot_dir: Optional[str] = None
@@ -590,6 +592,7 @@ class ServerArgs:
     agent_tool_timeout: float = 30.0
     agent_max_iterations: int = 10
     agent_max_tool_calls_per_iteration: int = 5
+    # --- END ENGRAM ---
 
     # Hierarchical cache
     enable_hierarchical_cache: bool = False
@@ -956,6 +959,7 @@ class ServerArgs:
                 "to be specified."
             )
 
+    # --- BEGIN ENGRAM: SSL validation method for Engram ---
     def _handle_ssl_validation(self):
         """Ensure SSL arguments are consistent and referenced files exist."""
         if self.ssl_keyfile and not self.ssl_certfile:
@@ -996,6 +1000,7 @@ class ServerArgs:
                 "--enable-ssl-refresh requires --ssl-certfile and --ssl-keyfile "
                 "to be specified."
             )
+    # --- END ENGRAM ---
 
     def _handle_deprecated_args(self):
         # Handle deprecated tool call parsers
@@ -5210,7 +5215,7 @@ class ServerArgs:
             "Options: 'triton' (default), 'flashinfer' (requires FlashInfer with Mamba support).",
         )
 
-        # Mamba state persistence (snapshot system)
+        # --- BEGIN ENGRAM: snapshot, memory tiers, agent tools CLI arguments ---
         def _nonneg_int(value):
             ivalue = int(value)
             if ivalue < 0:
@@ -5383,6 +5388,7 @@ class ServerArgs:
             default=ServerArgs.agent_max_tool_calls_per_iteration,
             help="Maximum tool calls per iteration. Default: 5.",
         )
+        # --- END ENGRAM ---
         parser.add_argument(
             "--linear-attn-backend",
             type=str,
@@ -6278,6 +6284,7 @@ class ServerArgs:
         elif host == "::":
             host = "::1"
         effective_port = port if port is not None else self.port
+        # ENGRAM_CHANGED: Engram uses proper IPv6 URL formatting with brackets
         if is_valid_ipv6_address(host):
             return f"{scheme}://[{host}]:{effective_port}"
         else:

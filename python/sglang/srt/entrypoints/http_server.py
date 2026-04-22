@@ -16,6 +16,7 @@ The entry point of inference server. (SRT = SGLang Runtime)
 
 This file implements HTTP APIs for the inference engine via fastapi.
 """
+# ENGRAM_MODIFIED — Snapshot HTTP endpoints, agent API routes, socket pre-binding
 
 import asyncio
 import dataclasses
@@ -115,16 +116,16 @@ from sglang.srt.managers.io_struct import (
     CloseSessionReqInput,
     ConfigureLoggingReq,
     ContinueGenerationReqInput,
-    DeleteSnapshotReqInput,
+    DeleteSnapshotReqInput,  # ENGRAM_CHANGED: Engram adds snapshot request types
     DestroyWeightsUpdateGroupReqInput,
     DumperControlReqInput,
     EmbeddingReqInput,
     GenerateReqInput,
-    GetSnapshotInfoReqInput,
+    GetSnapshotInfoReqInput,  # ENGRAM_CHANGED: Engram adds snapshot request types
     GetWeightsByNameReqInput,
     InitWeightsSendGroupForRemoteInstanceReqInput,
     InitWeightsUpdateGroupReqInput,
-    ListSnapshotsReqInput,
+    ListSnapshotsReqInput,  # ENGRAM_CHANGED: Engram adds snapshot request types
     LoadLoRAAdapterFromTensorsReqInput,
     LoadLoRAAdapterReqInput,
     OpenSessionReqInput,
@@ -132,9 +133,9 @@ from sglang.srt.managers.io_struct import (
     PauseGenerationReqInput,
     ProfileReqInput,
     ReleaseMemoryOccupationReqInput,
-    RestoreSnapshotReqInput,
+    RestoreSnapshotReqInput,  # ENGRAM_CHANGED: Engram adds snapshot request types
     ResumeMemoryOccupationReqInput,
-    SaveSnapshotReqInput,
+    SaveSnapshotReqInput,  # ENGRAM_CHANGED: Engram adds snapshot request types
     SendWeightsToRemoteInstanceReqInput,
     SeparateReasoningReqInput,
     SetInternalStateReq,
@@ -361,7 +362,7 @@ async def lifespan(fast_api_app: FastAPI):
         )
         logger.info("Warmup ended")
 
-    # Register agent API routes if enabled (Phase 4 + 4.5)
+    # --- BEGIN ENGRAM: agent API route registration (Phase 4 + 4.5) ---
     if getattr(server_args, "enable_agent_tools", False):
         try:
             from sglang.srt.agents.api.handlers import register_agent_api_routes
@@ -385,6 +386,7 @@ async def lifespan(fast_api_app: FastAPI):
             logger.warning(f"Failed to import agent API modules: {e}")
         except Exception as e:
             logger.error(f"Failed to register agent API routes: {e}", exc_info=True)
+    # --- END ENGRAM ---
 
     # Execute the general warmup
     warmup_thread = threading.Thread(
@@ -1240,6 +1242,7 @@ async def update_weight_version(obj: UpdateWeightVersionReqInput, request: Reque
         )
 
 
+# --- BEGIN ENGRAM: snapshot HTTP endpoints ---
 @app.post("/save_snapshot")
 @auth_level(AuthLevel.ADMIN_OPTIONAL)
 async def save_snapshot(obj: SaveSnapshotReqInput, request: Request):
@@ -1391,6 +1394,7 @@ async def delete_snapshot(obj: DeleteSnapshotReqInput, request: Request):
             },
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
         )
+# --- END ENGRAM ---
 
 
 @app.api_route("/get_weights_by_name", methods=["GET", "POST"])
@@ -2273,6 +2277,7 @@ def _setup_and_run_http_server(
         # Update logging configs
         set_uvicorn_logging_configs(server_args)
 
+        # --- BEGIN ENGRAM: pre-bound socket to reserve port early and avoid conflicts ---
         # Create a pre-bound socket so uvicorn can inherit the fd.
         # This reserves the port early and avoids conflicts.
         import socket as _socket
@@ -2346,6 +2351,7 @@ def _setup_and_run_http_server(
                     ssl_ca_certs=server_args.ssl_ca_certs,
                     ssl_keyfile_password=server_args.ssl_keyfile_password,
                 )
+        # --- END ENGRAM ---
         else:
             # Multiple tokenizer and http processes
             from uvicorn.config import LOGGING_CONFIG

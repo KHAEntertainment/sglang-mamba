@@ -11,6 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+# ENGRAM_MODIFIED — Mamba2Config support, safe architecture access
 """ModelRunner runs the forward passes of the models."""
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ from sglang.srt.configs import (
     Lfm2Config,
     Lfm2MoeConfig,
     Lfm2VlConfig,
-    Mamba2Config,
+    Mamba2Config,  # ENGRAM_CHANGED: Engram adds Mamba2Config for pure SSM model support
     NemotronH_Nano_VL_V2_Config,
     NemotronHConfig,
     Qwen3_5Config,
@@ -540,6 +541,7 @@ class ModelRunner(ModelRunnerKVCacheMixin):
                 self.model_config.num_attention_layers,
             )
         )
+        # --- BEGIN ENGRAM: safe architecture access for pure SSM/Mamba models ---
         # Check architectures safely for pure SSM/Mamba models that may not have it
         architectures = getattr(self.model_config.hf_config, "architectures", None)
         if architectures and len(architectures) > 0:
@@ -547,6 +549,7 @@ class ModelRunner(ModelRunnerKVCacheMixin):
                 model_num_layers = 1
             elif architectures[0] == "Step3p5MTP":
                 model_num_layers = 1
+        # --- END ENGRAM ---
         self.start_layer = getattr(self.model, "start_layer", 0)
         self.end_layer = getattr(self.model, "end_layer", model_num_layers)
         self.num_effective_layers = self.end_layer - self.start_layer
@@ -1877,6 +1880,7 @@ class ModelRunner(ModelRunnerKVCacheMixin):
             else:
                 return config
 
+        # ENGRAM_CHANGED: Engram passes Mamba2Config through without conversion
         if isinstance(config, Mamba2Config):
             return config
 

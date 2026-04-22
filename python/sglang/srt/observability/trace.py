@@ -11,6 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+# ENGRAM_MODIFIED — Safer exception handling in host ID detection
 """package for sglang requests tracing"""
 
 from __future__ import annotations
@@ -146,7 +147,7 @@ def __get_host_id() -> str:
         try:
             with open("/etc/machine-id", "r") as f:
                 return f.read().strip()
-        except (OSError, UnicodeError):
+        except (OSError, UnicodeError):  # ENGRAM_CHANGED: Engram narrows bare except to specific, safe exceptions
             pass
 
     mac = uuid.getnode()
