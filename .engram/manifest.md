@@ -285,14 +285,14 @@ The following are not fork-differentiated and accept upstream changes verbatim:
 
 | Metric | Count |
 |--------|-------|
-| ENGRAM_MODIFIED headers | 71 |
-| BEGIN/END ENGRAM blocks | 68 |
+| ENGRAM_MODIFIED headers | 85 |
+| BEGIN/END ENGRAM blocks | 322 |
 | Modified files without headers | 8 (all small/cosmetic: go.mod, go.sum, examples, etc.) |
 | Added files without headers | ~100+ (pure additions, no markers needed) |
 
 ## Block Count by Subsystem
 
-### High Conflict Risk (5+ blocks): 45 total
+### High Conflict Risk (45 total)
 | Subsystem | Files | Blocks |
 |-----------|-------|--------|
 | Scheduler | 1 | 15 |
@@ -306,7 +306,7 @@ The following are not fork-differentiated and accept upstream changes verbatim:
 | Schedule Batch | 1 | 2 |
 | Model Config | 1 | 2 |
 
-### Other Modified (fewer blocks): 24 total
+### Other Modified (24 total)
 | File | Blocks |
 |------|--------|
 | OpenAI protocol | 2 |
@@ -320,11 +320,12 @@ The following are not fork-differentiated and accept upstream changes verbatim:
 | runtime_endpoint | 1 |
 | interpreter | 1 |
 | fused_metadata_copy | 3 |
+| memory_pool | 1 |
 | .gitignore | 3 |
 | .pre-commit-config.yaml | 2 |
-| All others (17 files) | 0 |
+| All others (13 files) | 0 |
 
-**Grand total: 69 blocks** (in modified Python files only; 322 total blocks across all file types per global grep)
+**Grand total: 69 blocks** (45 high conflict + 24 other modified = 69 blocks in modified Python files; 322 total blocks across all file types per global grep)
 
 ### Per-file verification
 Run `grep -c "BEGIN ENGRAM" <filepath>` on any file listed above to verify.
