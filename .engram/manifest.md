@@ -41,38 +41,38 @@ These are the files where upstream changes will most likely conflict with Engram
 | `python/sglang/srt/configs/model_config.py` | 2 | +37 | Mamba config adaptations (safe architecture access, multimodal guards) |
 | `python/sglang/srt/mem_cache/memory_pool.py` | 1 | +9 | Mamba memory pool hooks |
 
-### Core Engine — Other Modified Files (fewer blocks)
+### Core Engine — Other Modified Files (fewer blocks) (subtotal: 12 blocks)
 
 | File | Blocks | +/- | Description |
 |------|--------|-----|-------------|
 | `python/sglang/srt/observability/trace.py` | 0 | +2 | Safer exception handling in host ID detection |
-| `python/sglang/srt/model_executor/model_runner.py` | 1 | +15 | Mamba2Config support, safe architecture access |
-| `python/sglang/srt/entrypoints/openai/protocol.py` | — | — | Snapshot fields in OpenAI-compatible API protocol |
-| `python/sglang/srt/entrypoints/openai/serving_chat.py` | — | — | Snapshot passthrough in chat |
-| `python/sglang/srt/entrypoints/openai/serving_completions.py` | — | — | Snapshot passthrough in completions |
-| `python/sglang/srt/observability/req_time_stats.py` | — | — | Snapshot timing statistics |
-| `python/sglang/srt/models/nemotron_h.py` | — | — | Mamba state hooks for Nemotron-H |
-| `python/sglang/srt/utils/hf_transformers_utils.py` | — | — | Mamba2Config registry entry |
-| `python/sglang/srt/utils/network.py` | — | — | Network utilities for snapshot system |
-| `python/sglang/srt/utils/common.py` | — | — | Snapshot utility functions |
-| `python/sglang/__init__.py` | — | — | Snapshot module import |
-| `python/sglang/lang/backend/runtime_endpoint.py` | — | — | Snapshot API client |
-| `python/sglang/lang/interpreter.py` | — | — | Snapshot interpreter support |
-| `python/sglang/jit_kernel/fused_metadata_copy.py` | — | — | Mamba metadata kernel extensions |
-| `python/sglang/test/run_eval.py` | — | — | Test runner adaptation |
-| `benchmark/hicache/bench_multiturn.py` | — | — | Benchmark adaptation for Mamba |
-| `scripts/ci/utils/diffusion/generate_diffusion_dashboard.py` | — | — | Dashboard fork tweak |
-| `scripts/ci/utils/slash_command_handler.py` | — | — | CI handler fork tweak |
-| `sgl-kernel/benchmark/bench_fp4_gemm.py` | — | — | Benchmark fork tweak |
-| `sgl-kernel/python/sgl_kernel/flash_mla.py` | — | — | Kernel fork tweak |
-| `sgl-model-gateway/bindings/golang/go.mod` | — | — | Go module (not fork-differentiated) |
-| `sgl-model-gateway/bindings/golang/go.sum` | — | — | Go module (not fork-differentiated) |
-| `sgl-model-gateway/bindings/golang/examples/oai_server/go.mod` | — | — | Go example (not fork-differentiated) |
-| `sgl-model-gateway/bindings/golang/examples/oai_server/go.sum` | — | — | Go example (not fork-differentiated) |
-| `docs/references/production_request_trace.md` | — | — | Snapshot trace documentation |
-| `README.md` | — | — | Fork README: Engram project description, benchmarks, documentation links |
-| `.gitignore` | — | — | Fork-specific ignore patterns |
-| `.pre-commit-config.yaml` | — | — | Fork pre-commit configuration |
+| `python/sglang/srt/model_executor/model_runner.py` | 0 | +15 | Mamba2Config support, safe architecture access |
+| `python/sglang/srt/entrypoints/openai/protocol.py` | 2 | — | Snapshot fields in OpenAI-compatible API protocol |
+| `python/sglang/srt/entrypoints/openai/serving_chat.py` | 1 | — | Snapshot passthrough in chat |
+| `python/sglang/srt/entrypoints/openai/serving_completions.py` | 1 | — | Snapshot passthrough in completions |
+| `python/sglang/srt/observability/req_time_stats.py` | 1 | — | Snapshot timing statistics |
+| `python/sglang/srt/models/nemotron_h.py` | 0 | — | Mamba state hooks for Nemotron-H |
+| `python/sglang/srt/utils/hf_transformers_utils.py` | 2 | — | Mamba2Config registry entry |
+| `python/sglang/srt/utils/network.py` | 2 | — | Network utilities for snapshot system |
+| `python/sglang/srt/utils/common.py` | 2 | — | Snapshot utility functions |
+| `python/sglang/__init__.py` | 2 | — | Snapshot module import |
+| `python/sglang/lang/backend/runtime_endpoint.py` | 1 | — | Snapshot API client |
+| `python/sglang/lang/interpreter.py` | 1 | — | Snapshot interpreter support |
+| `python/sglang/jit_kernel/fused_metadata_copy.py` | 3 | — | Mamba metadata kernel extensions |
+| `python/sglang/test/run_eval.py` | 0 | — | Test runner adaptation |
+| `benchmark/hicache/bench_multiturn.py` | 0 | — | Benchmark adaptation for Mamba |
+| `scripts/ci/utils/diffusion/generate_diffusion_dashboard.py` | 0 | — | Dashboard fork tweak |
+| `scripts/ci/utils/slash_command_handler.py` | 0 | — | CI handler fork tweak |
+| `sgl-kernel/benchmark/bench_fp4_gemm.py` | 0 | — | Benchmark fork tweak |
+| `sgl-kernel/python/sgl_kernel/flash_mla.py` | 0 | — | Kernel fork tweak |
+| `sgl-model-gateway/bindings/golang/go.mod` | 0 | — | Go module (not fork-differentiated) |
+| `sgl-model-gateway/bindings/golang/go.sum` | 0 | — | Go module (not fork-differentiated) |
+| `sgl-model-gateway/bindings/golang/examples/oai_server/go.mod` | 0 | — | Go example (not fork-differentiated) |
+| `sgl-model-gateway/bindings/golang/examples/oai_server/go.sum` | 0 | — | Go example (not fork-differentiated) |
+| `docs/references/production_request_trace.md` | 0 | — | Snapshot trace documentation |
+| `README.md` | 0 | — | Fork README: Engram project description, benchmarks, documentation links |
+| `.gitignore` | 3 | — | Fork-specific ignore patterns |
+| `.pre-commit-config.yaml` | 2 | — | Fork pre-commit configuration |
 
 ## CI Workflows (39 files — uniform fork guard)
 
@@ -241,7 +241,7 @@ Phased test protocol with individual phase runbooks, results, and scripts:
 | `test/manual/test_streaming_session_leak.py` | Manual test |
 | `benchmark/hicache/bench_multiturn.py` | Multi-turn benchmark |
 
-### Assets & Branding (5 files)
+### Assets & Branding (6 files)
 
 | File | Purpose |
 |------|---------|
@@ -292,6 +292,7 @@ The following are not fork-differentiated and accept upstream changes verbatim:
 
 ## Block Count by Subsystem
 
+### High Conflict Risk (5+ blocks): 46 total
 | Subsystem | Files | Blocks |
 |-----------|-------|--------|
 | Scheduler | 1 | 15 |
@@ -300,10 +301,31 @@ The following are not fork-differentiated and accept upstream changes verbatim:
 | Server Args | 1 | 3 |
 | Mamba Radix Cache | 1 | 3 |
 | IO Struct | 1 | 3 |
-| Model Runner KV Cache Mixin | 1 | 3 |
+| Model Runner KV Cache Mixin | 1 | 2 |
 | Scheduler Output Processor | 1 | 3 |
 | Schedule Batch | 1 | 2 |
 | Model Config | 1 | 2 |
 | Memory Pool | 1 | 1 |
-| Model Runner | 1 | 1 |
-| Trace | 1 | 0 |
+
+### Other Modified (fewer blocks): 23 total
+| File | Blocks |
+|------|--------|
+| OpenAI protocol | 2 |
+| OpenAI serving_chat | 1 |
+| OpenAI serving_completions | 1 |
+| req_time_stats | 1 |
+| hf_transformers_utils | 2 |
+| network | 2 |
+| common | 2 |
+| __init__.py | 2 |
+| runtime_endpoint | 1 |
+| interpreter | 1 |
+| fused_metadata_copy | 3 |
+| .gitignore | 3 |
+| .pre-commit-config.yaml | 2 |
+| All others (17 files) | 0 |
+
+**Grand total: 69 blocks** (in modified Python files only; 322 total blocks across all file types per global grep)
+
+### Per-file verification
+Run `grep -c "BEGIN ENGRAM" <filepath>` on any file listed above to verify.
