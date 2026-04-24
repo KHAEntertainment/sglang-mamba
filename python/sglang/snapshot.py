@@ -11,6 +11,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # ==============================================================================
+# ENGRAM_MODIFIED — High-level snapshot management public API (Engram-added)
 """
 High-level snapshot management API for SGLang.
 

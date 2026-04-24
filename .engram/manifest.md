@@ -2,8 +2,8 @@
 # Engram Fork Manifest
 
 > Auto-generated from `git diff upstream/main...HEAD` and ENGRAM_MODIFIED markers.
-> Last updated: 2026-04-21
-> Commit: 2d047c4996f13fc1bfc08a7fb6f1eedd7f2b2906
+> Last updated: 2026-04-24
+> Commit: 2d047c4996f13fc1bfc08a7fb6f1eedd7f2b2906 (+ pre-merge snapshot.py addition)
 
 ## How to use this file
 
@@ -17,10 +17,10 @@
 | Category | Count |
 |----------|-------|
 | Modified files (M) | 79 |
-| Added files (A) | 176 |
+| Added files (A) | 177 |
 | Deleted files (D) | 7 |
 | Renamed files (R) | 4 |
-| Total ENGRAM_MODIFIED headers | 85 |
+| Total ENGRAM_MODIFIED headers | 86 |
 | Total BEGIN/END ENGRAM blocks | 322 |
 
 ## High Conflict Risk — Modified Upstream Files ⚠️
@@ -127,10 +127,11 @@ This disables upstream CI on the Engram fork. New/changed workflows added by Eng
 
 ## Added Files — Engram-Only
 
-### Snapshot System (8 files)
+### Snapshot System (9 files)
 
 | File | Purpose |
 |------|---------|
+| `python/sglang/snapshot.py` | **Public API** — top-level SnapshotManager + exception hierarchy |
 | `python/sglang/srt/snapshot/__init__.py` | Snapshot module exports |
 | `python/sglang/srt/snapshot/conversation_tracker.py` | Multi-turn conversation state tracking |
 | `python/sglang/srt/snapshot/mamba_host_pool.py` | Multi-host Mamba state pool management |
@@ -285,7 +286,7 @@ The following are not fork-differentiated and accept upstream changes verbatim:
 
 | Metric | Count |
 |--------|-------|
-| ENGRAM_MODIFIED headers | 85 |
+| ENGRAM_MODIFIED headers | 86 |
 | BEGIN/END ENGRAM blocks | 322 |
 | Modified files without headers | 8 (all small/cosmetic: go.mod, go.sum, examples, etc.) |
 | Added files without headers | ~100+ (pure additions, no markers needed) |
