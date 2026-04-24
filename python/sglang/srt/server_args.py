@@ -1017,10 +1017,10 @@ class ServerArgs:
                     "Multi-worker HTTP/2 support will be added in a future release."
                 )
 
-    # ENGRAM_CONFLICT_REVIEW: fork's ENGRAM block defined a redundant _handle_ssl_validation
+    # Note: fork's ENGRAM block previously defined a redundant _handle_ssl_validation
     # method here; upstream adopted a byte-identical version at line 957 of this file,
-    # so the duplicate was removed during the 2026-04-24 merge. Manifest block count
-    # for server_args.py reduced 3 → 2.
+    # so the duplicate was removed during the 2026-04-24 upstream sync. Manifest block
+    # count for server_args.py reduced 3 → 2 (fully resolved; no further action needed).
     def _handle_multimodal(self):
         """Validate mm_process_config structure before model loading."""
         if self.mm_process_config is not None:
